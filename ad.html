@@ -1,13 +1,15 @@
 <html>
 
 <head>
-	<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
-
-	<script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", {async_callback: 1});'></script>
+	<script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
+	 	{ type: 0, async_callback: 1, callback: function(result) { 
+			alert("Adscore Verification is completed: " + result);
+		 }});'>
+	</script>
 </head>
 
 <body>
-	<p>测试广告内容</p>
+	<p style="width: 100vm; height: 100vh; text-align: center; line-height: 100vh;">测试广告内容</p>
 </body>
 
 </html>
