@@ -3,12 +3,13 @@
 <head>
 	<script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
 	 	{ 
+			async_callback: 1, 
 			callback: function(result) { 
 				alert(JSON.stringify(result));
 			}, 
 			debug_callback: function(d) {
 				console.log("debug_callback: " + d);
-				return false;
+				return true;
 			} 
 		});'>
 	</script>
