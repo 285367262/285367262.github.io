@@ -1,10 +1,10 @@
 <html>
 
 <head>
-	<!-- <script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
+	<script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
 	 	{ 
 			type: 0, 
-			async_callback: 1, 
+			async_callback: 0, 
 			callback: function(result) { 
 				alert(JSON.stringify(result));
 		 	}, 
@@ -13,7 +13,7 @@
 				return true;
 			} 
 		});'>
-	</script> -->
+	</script>
 
 	<script>
 		/**
@@ -113,9 +113,9 @@
 			return info;
 		}
 
-		getFullDeviceInfo().then((info)=>{
-			console.log('info=' + JSON.stringify(info))
-		}).catch(console.error);
+		// getFullDeviceInfo().then((info)=>{
+		// 	console.log('info=' + JSON.stringify(info))
+		// }).catch(console.error);
 
 	</script>
 </head>
