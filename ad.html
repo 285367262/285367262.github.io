@@ -1,17 +1,137 @@
 <html>
 
 <head>
-	<script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
+	<!-- <script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
 	 	{ 
-			async_callback: 0, 
+			type: 0, 
+			async_callback: 1, 
 			callback: function(result) { 
 				alert(JSON.stringify(result));
-			}, 
-			debug_callback: function(d) {
+		 	}, 
+		 	debug_callback: function(d) {
 				console.log("debug_callback: " + d);
 				return true;
 			} 
 		});'>
+	</script> -->
+
+	<script>
+		/**
+		 * 获取设备综合信息（支持现代浏览器）
+		 * @returns {Promise<Object>} 包含12类设备数据的结构化对象 
+		 */
+		async function getFullDeviceInfo() {
+			console.log('start getFullDeviceInfo....')
+			const result = await new Promise((resolve) => resolve("Done")); // 正确：await 在 async 函数中
+			console.log(result);
+
+			// 基础信息容器 
+			const info = {
+				metadata: {
+					timestamp: new Date().toISOString(),
+					ua: navigator.userAgent,
+					isSecure: window.isSecureContext
+				},
+				systemInfo: {},
+				sensors: {},
+				storage: {},
+				userAgent: {},
+				errors: []
+			};
+
+			try {
+				// 1. 硬件与系统信息 
+				info.systemInfo = {
+					cpuCores: navigator.hardwareConcurrency || 'unreported',
+					deviceMemory: navigator.deviceMemory || 'unreported',
+					maxTouchPoints: navigator.maxTouchPoints || 0
+				};
+
+				// 2. 存储信息（WebKit/标准API兼容）
+				/* if (navigator.webkitTemporaryStorage?.queryUsageAndQuota) {
+					console.log('Info-0=' + JSON.stringify(info))
+
+					await new Promise(resolve => {
+						navigator.webkitTemporaryStorage.queryUsageAndQuota(
+							(usage, quota) => {
+								info.storage.temporary = { usage, quota };
+								resolve();
+							},
+							(err) => info.errors.push(`StorageError:  ${err.message}`)
+						);
+					});
+					console.log('Info-000=' + JSON.stringify(info))
+
+				} else if (navigator.storage?.estimate) {
+					const estimate = await navigator.storage.estimate();
+					info.storage.temporary = {
+						usage: estimate.usage,
+						quota: estimate.quota
+					};
+				} */
+
+				// 3. UA高级信息（需要用户授权）
+				if (navigator.userAgentData?.getHighEntropyValues) {
+					console.log('Info-1=' + JSON.stringify(info))
+
+					try {
+						info.userAgent.highEntropy = await navigator.userAgentData.getHighEntropyValues([
+							'architecture', 'bitness', 'model', 'platformVersion',
+							'fullVersionList', 'uaFullVersion'
+						]);
+					} catch (e) {
+						info.errors.push(`UAHighEntropyDenied:  ${e.message}`);
+					}
+				}
+
+				// 4. 媒体设备信息（需要麦克风/摄像头授权）
+				if (navigator.mediaDevices?.enumerateDevices) {
+					console.log('Info-2=' + JSON.stringify(info))
+
+					try {
+						const devices = await navigator.mediaDevices.enumerateDevices();
+						info.mediaDevices = devices.map(d => ({
+							kind: d.kind,
+							groupId: d.groupId.slice(0, 6) + '...', // 隐私处理 
+							label: d.label || '[Permission Required]'
+						}));
+					} catch (e) {
+						info.errors.push(`MediaDevicesError:  ${e.message}`);
+					}
+				}
+				console.log('Info-22=' + JSON.stringify(info))
+
+				// 5. 传感器信息（需要设备运动授权）
+				if ('DeviceOrientationEvent' in window) {
+					console.log('Info-3=' + JSON.stringify(info))
+
+					info.sensors.orientation = await new Promise(resolve => {
+						const handler = (event) => {
+							window.removeEventListener('deviceorientation', handler);
+							resolve({
+								alpha: event.alpha?.toFixed(2),
+								beta: event.beta?.toFixed(2),
+								gamma: event.gamma?.toFixed(2)
+							});
+						};
+						window.addEventListener('deviceorientation', handler, { once: true });
+						setTimeout(() => resolve('timeout'), 1000);
+					});
+				}
+
+			} catch (majorError) {
+				console.log('majorError=' + majorError)
+				info.errors.push(`CriticalError:  ${majorError.message}`);
+			}
+
+			console.log('getFullDeviceInfo=' + JSON.stringify(info))
+			return info;
+		}
+
+		getFullDeviceInfo().then((info)=>{
+			console.log('info=' + JSON.stringify(info))
+		}).catch(console.error);
+
 	</script>
 </head>
 
