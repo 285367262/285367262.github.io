@@ -48,9 +48,7 @@
 				};
 
 				// 2. 存储信息（WebKit/标准API兼容）
-				/* if (navigator.webkitTemporaryStorage?.queryUsageAndQuota) {
-					console.log('Info-0=' + JSON.stringify(info))
-
+				if (navigator.webkitTemporaryStorage?.queryUsageAndQuota) {
 					await new Promise(resolve => {
 						navigator.webkitTemporaryStorage.queryUsageAndQuota(
 							(usage, quota) => {
@@ -60,20 +58,16 @@
 							(err) => info.errors.push(`StorageError:  ${err.message}`)
 						);
 					});
-					console.log('Info-000=' + JSON.stringify(info))
-
 				} else if (navigator.storage?.estimate) {
 					const estimate = await navigator.storage.estimate();
 					info.storage.temporary = {
 						usage: estimate.usage,
 						quota: estimate.quota
 					};
-				} */
+				} 
 
 				// 3. UA高级信息（需要用户授权）
 				if (navigator.userAgentData?.getHighEntropyValues) {
-					console.log('Info-1=' + JSON.stringify(info))
-
 					try {
 						info.userAgent.highEntropy = await navigator.userAgentData.getHighEntropyValues([
 							'architecture', 'bitness', 'model', 'platformVersion',
@@ -86,8 +80,6 @@
 
 				// 4. 媒体设备信息（需要麦克风/摄像头授权）
 				if (navigator.mediaDevices?.enumerateDevices) {
-					console.log('Info-2=' + JSON.stringify(info))
-
 					try {
 						const devices = await navigator.mediaDevices.enumerateDevices();
 						info.mediaDevices = devices.map(d => ({
@@ -99,12 +91,8 @@
 						info.errors.push(`MediaDevicesError:  ${e.message}`);
 					}
 				}
-				console.log('Info-22=' + JSON.stringify(info))
-
 				// 5. 传感器信息（需要设备运动授权）
 				if ('DeviceOrientationEvent' in window) {
-					console.log('Info-3=' + JSON.stringify(info))
-
 					info.sensors.orientation = await new Promise(resolve => {
 						const handler = (event) => {
 							window.removeEventListener('deviceorientation', handler);
@@ -115,22 +103,17 @@
 							});
 						};
 						window.addEventListener('deviceorientation', handler, { once: true });
-						setTimeout(() => resolve('timeout'), 1000);
+						setTimeout(() => resolve('timeout'), 3000);
 					});
 				}
 
 			} catch (majorError) {
-				console.log('majorError=' + majorError)
 				info.errors.push(`CriticalError:  ${majorError.message}`);
 			}
-
-			console.log('getFullDeviceInfo=' + JSON.stringify(info))
 			return info;
 		}
 
-		getFullDeviceInfo().then((info)=>{
-			console.log('info=' + JSON.stringify(info))
-		}).catch(console.error);
+		getFullDeviceInfo().then(console.log).catch(console.error);
 
 	</script>
 </head>
