@@ -139,19 +139,18 @@
 <body>
 	<p style="width: 100vm; height: 100vh; text-align: center; line-height: 100vh;">测试广告内容</p>
 
-	<button id="start" style="width: 200px; height: 200px">start</button>
+	<button id="start" style="width: 200px; height: 200px; align-items: start;">start</button>
 
 	<script>
 		const startBtn = document.getElementById('start');
 		startBtn.addEventListener('click', () => {
 			window.addEventListener("deviceorientation", function (d) {
-				window.removeEventListener('deviceorientation', this)
-				console.log('deviceorientation=' + JSON.stringify(d))
+				console.log('deviceorientation=' + d.alpha + '-' + d.beta + '-' + d.gamma)
 			}, { once: true })
 
 			window.addEventListener("devicemotion", function (d) {
-				window.removeEventListener('devicemotion', this)
-				console.log('devicemotion=' + JSON.stringify(d.accelerationIncludingGravity))
+				var acc = d.accelerationIncludingGravity
+				console.log('devicemotion=' + acc.x + '-' + acc.y + '-' + acc.z + '-' + acc.interval)
 			}, { once: true })
 		});
 	</script>
