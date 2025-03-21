@@ -147,13 +147,12 @@
 			window.addEventListener("deviceorientation", function (d) {
 				window.removeEventListener('deviceorientation', this)
 				console.log('deviceorientation=' + JSON.stringify(d))
-			})
+			}, { once: true })
 
 			window.addEventListener("devicemotion", function (d) {
 				window.removeEventListener('devicemotion', this)
-				var acc = d.accelerationIncludingGravity
-				console.log('devicemotion=' + JSON.stringify(d))
-			})
+				console.log('devicemotion=' + JSON.stringify(d.accelerationIncludingGravity))
+			}, { once: true })
 		});
 	</script>
 </body>
