@@ -145,12 +145,12 @@
 		const startBtn = document.getElementById('start');
 		startBtn.addEventListener('click', () => {
 			window.addEventListener("deviceorientation", function (d) {
-				window.removeEventListener(this)
+				window.removeEventListener('deviceorientation', this)
 				console.log('deviceorientation=' + JSON.stringify(d))
 			})
 
 			window.addEventListener("devicemotion", function (d) {
-				window.removeEventListener(this)
+				window.removeEventListener('devicemotion', this)
 				var acc = d.accelerationIncludingGravity
 				console.log('devicemotion=' + JSON.stringify(d))
 			})
