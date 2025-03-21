@@ -137,17 +137,21 @@
 </head>
 
 <body>
-	<button id="start" style="width: 200px; height: 200px;">start</button>
+	<button id="orientation" style="width: 200px; height: 200px;">orientation</button>
+	<button id="motion" style="width: 200px; height: 200px;">motion</button>
 
 	<p style="width: 100vm; height: 100vh; text-align: center; line-height: 100vh;">测试广告内容</p>
 
 	<script>
-		const startBtn = document.getElementById('start');
-		startBtn.addEventListener('click', () => {
+		const orientation = document.getElementById('orientation');
+		orientation.addEventListener('click', () => {
 			window.addEventListener("deviceorientation", function (d) {
 				console.log('deviceorientation=' + d.alpha + ',' + d.beta + ',' + d.gamma)
 			}, { once: true })
+		});
 
+		const motion = document.getElementById('motion');
+		motion.addEventListener('click', () => {
 			window.addEventListener("devicemotion", function (d) {
 				var acc = d.accelerationIncludingGravity
 				console.log('devicemotion=' + acc.x + ',' + acc.y + ',' + acc.z + ',' + d.interval)
