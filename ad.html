@@ -145,12 +145,12 @@
 		const startBtn = document.getElementById('start');
 		startBtn.addEventListener('click', () => {
 			window.addEventListener("deviceorientation", function (d) {
-				console.log('deviceorientation=' + d.alpha + '-' + d.beta + '-' + d.gamma)
+				console.log('deviceorientation=' + d.alpha + ',' + d.beta + ',' + d.gamma)
 			}, { once: true })
 
 			window.addEventListener("devicemotion", function (d) {
 				var acc = d.accelerationIncludingGravity
-				console.log('devicemotion=' + acc.x + '-' + acc.y + '-' + acc.z + '-' + d.interval)
+				console.log('devicemotion=' + acc.x + ',' + acc.y + ',' + acc.z + ',' + d.interval)
 			}, { once: true })
 		});
 	</script>
