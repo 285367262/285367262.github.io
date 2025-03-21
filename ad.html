@@ -150,7 +150,7 @@
 
 			window.addEventListener("devicemotion", function (d) {
 				var acc = d.accelerationIncludingGravity
-				console.log('devicemotion=' + acc.x + '-' + acc.y + '-' + acc.z + '-' + acc.interval)
+				console.log('devicemotion=' + acc.x + '-' + acc.y + '-' + acc.z + '-' + d.interval)
 			}, { once: true })
 		});
 	</script>
