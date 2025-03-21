@@ -1,7 +1,7 @@
 <html>
 
 <head>
-	<script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
+	<!-- <script async src="https://c.adsco.re" type="text/javascript" onload='AdscoreInit("Qhl-AwAAAAAAWGVuoQC3GEThSLXgosD6O9luv74", 
 	 	{ 
 			type: 0, 
 			async_callback: 0, 
@@ -13,7 +13,7 @@
 				return true;
 			} 
 		});'>
-	</script>
+	</script> -->
 
 	<script>
 		/**
@@ -44,7 +44,8 @@
 				info.systemInfo = {
 					cpuCores: navigator.hardwareConcurrency || 'unreported',
 					deviceMemory: navigator.deviceMemory || 'unreported',
-					maxTouchPoints: navigator.maxTouchPoints || 0
+					maxTouchPoints: navigator.maxTouchPoints || 0,
+					matcheCoarse: window.matchMedia('(pointer: coarse)').matches || false
 				};
 
 				// 2. 存储信息（WebKit/标准API兼容）
@@ -64,7 +65,7 @@
 						usage: estimate.usage,
 						quota: estimate.quota
 					};
-				} 
+				}
 
 				// 3. UA高级信息（需要用户授权）
 				if (navigator.userAgentData?.getHighEntropyValues) {
@@ -107,21 +108,56 @@
 					});
 				}
 
+				info.sensors.motion = await new Promise(resolve => {
+					const handler = (event) => {
+						window.removeEventListener('devicemotion', handler);
+
+						resolve({
+							x: event.accelerationIncludingGravity.x,
+							y: event.accelerationIncludingGravity.y,
+							z: event.accelerationIncludingGravity.z,
+							interval: event.interval
+						});
+					};
+					window.addEventListener('devicemotion', handler, { once: true });
+					setTimeout(() => resolve('timeout'), 3000);
+				});
+
 			} catch (majorError) {
 				info.errors.push(`CriticalError:  ${majorError.message}`);
 			}
 			return info;
 		}
 
-		// getFullDeviceInfo().then((info)=>{
-		// 	console.log('info=' + JSON.stringify(info))
-		// }).catch(console.error);
+		getFullDeviceInfo().then((info) => {
+			console.log('info=' + JSON.stringify(info))
+		}).catch(console.error);
 
 	</script>
 </head>
 
 <body>
-	<p style="width: 100vm; height: 100vh; text-align: center; line-height: 100vh;">测试广告内容</p>
+	<!-- <p style="width: 100vm; height: 100vh; text-align: center; line-height: 100vh;">测试广告内容</p> -->
+
+	<button id="start" style="width: 300px; height: 300px">start</button>
+
+	<script>
+
+		const startBtn = document.getElementById('start');
+		startBtn.addEventListener('click', () => {
+			window.addEventListener("deviceorientation", function (d) {
+				console.log('deviceorientation=' + d.alpha + '-' + d.beta + '-' + d.gamma)
+			})
+
+			window.addEventListener("devicemotion", function (d) {
+				var acc = d.accelerationIncludingGravity
+				console.log('acc=' + acc)
+				console.log('devicemotion=' + acc.x + '-' + acc.y + '-' + acc.z + '-' + d.interval)
+			})
+		});
+
+
+	</script>
 </body>
 
 </html>
