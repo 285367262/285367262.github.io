@@ -144,9 +144,10 @@
 
 	<script>
 		const orientation = document.getElementById('orientation');
+		var i = 0;
 		orientation.addEventListener('click', () => {
 			window.addEventListener("deviceorientation", function (d) {
-				console.log('deviceorientation=' + d.alpha + ',' + d.beta + ',' + d.gamma)
+				console.log((++i) + '-deviceorientation=' + d.alpha + ',' + d.beta + ',' + d.gamma)
 			})
 		});
 
