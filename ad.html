@@ -147,7 +147,7 @@
 		orientation.addEventListener('click', () => {
 			window.addEventListener("deviceorientation", function (d) {
 				console.log('deviceorientation=' + d.alpha + ',' + d.beta + ',' + d.gamma)
-			}, { once: true })
+			})
 		});
 
 		const motion = document.getElementById('motion');
