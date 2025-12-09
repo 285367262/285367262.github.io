@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浏览器信息采集Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .control-panel {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button.secondary {
+            background: #2196F3;
+        }
+        
+        button.secondary:hover {
+            background: #0b7dda;
+        }
+        
+        .output-area {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .summary {
+            background: #e8f5e9;
+            border: 1px solid #c8e6c9;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .summary h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 浏览器信息采集演示</h1>
+        
+        <div class="control-panel">
+            <button id="collectBtn" onclick="startCollection()">开始采集信息</button>
+            <button class="secondary" onclick="showSummary()">显示摘要</button>
+            <button class="secondary" onclick="clearOutput()">清空输出</button>
+            <button onclick="exportJSON()">导出JSON</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="summary" id="summaryContainer" style="display: none;">
+            <h3>📊 信息摘要</h3>
+            <div id="summaryContent"></div>
+        </div>
+        
+        <div class="output-area" id="output">
+            点击"开始采集信息"按钮查看浏览器详细信息...
+        </div>
+    </div>
+
+    <script>
+        // 浏览器信息采集器类
+        class BrowserInfoCollector {
+            constructor() {
+                this.collectedData = {};
+            }
+            
+            // 主收集方法
+            async collectAllInfo() {
+                console.log('开始收集浏览器信息...\n');
+                
+                try {
+                    // 同步收集的信息
+                    this.collectedData.basic = this.collectBasicInfo();
+                    this.collectedData.screen = this.collectScreenInfo();
+                    this.collectedData.navigator = this.collectNavigatorInfo();
+                    this.collectedData.webgl = this.collectWebGLInfo();
+                    this.collectedData.canvas = this.collectCanvasInfo();
+                    this.collectedData.fonts = await this.collectFontsInfo();
+                    this.collectedData.battery = await this.collectBatteryInfo();
+                    this.collectedData.network = this.collectNetworkInfo();
+                    this.collectedData.storage = this.collectStorageInfo();
+                    this.collectedData.plugins = this.collectPluginsInfo();
+                    this.collectedData.performance = this.collectPerformanceInfo();
+                    this.collectedData.time = this.collectTimeInfo();
+                    
+                    // 添加时间戳和版本
+                    this.collectedData.meta = {
+                        collectionTime: new Date().toISOString(),
+                        version: '1.0',
+                        timestamp: Date.now()
+                    };
+                    
+                    console.log('✅ 信息收集完成！');
+                    
+                } catch (error) {
+                    console.error('❌ 收集过程中出现错误:', error);
+                    this.collectedData.error = error.message;
+                }
+                
+                return this.collectedData;
+            }
+            
+            // 1. 基本浏览器信息
+            collectBasicInfo() {
+                return {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    language: navigator.language,
+                    languages: navigator.languages || [],
+                    vendor: navigator.vendor || 'unknown',
+                    cookieEnabled: navigator.cookieEnabled,
+                    doNotTrack: navigator.doNotTrack || 'unknown',
+                    maxTouchPoints: navigator.maxTouchPoints || 0,
+                    hardwareConcurrency: navigator.hardwareConcurrency || 0,
+                    deviceMemory: navigator.deviceMemory || 'unknown'
+                };
+            }
+            
+            // 2. 屏幕信息
+            collectScreenInfo() {
+                return {
+                    width: screen.width,
+                    height: screen.height,
+                    availWidth: screen.availWidth,
+                    availHeight: screen.availHeight,
+                    colorDepth: screen.colorDepth,
+                    pixelDepth: screen.pixelDepth,
+                    orientation: screen.orientation ? {
+                        type: screen.orientation.type,
+                        angle: screen.orientation.angle
+                    } : 'not supported'
+                };
+            }
+            
+            // 3. 导航器扩展信息
+            collectNavigatorInfo() {
+                return {
+                    product: navigator.product,
+                    appName: navigator.appName,
+                    appVersion: navigator.appVersion,
+                    appCodeName: navigator.appCodeName,
+                    onLine: navigator.onLine,
+                    geolocation: 'geolocation' in navigator,
+                    serviceWorker: 'serviceWorker' in navigator,
+                    webdriver: navigator.webdriver || false,
+                    pdfViewerEnabled: navigator.pdfViewerEnabled || false
+                };
+            }
+            
+            // 4. WebGL信息
+            collectWebGLInfo() {
+                const result = {
+                    supported: false,
+                    extensions: [],
+                    renderer: null,
+                    vendor: null
+                };
+                
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    
+                    if (gl) {
+                        result.supported = true;
+                        
+                        // 获取扩展列表
+                        const extensions = gl.getSupportedExtensions();
+                        result.extensions = extensions || [];
+                        
+                        // 获取渲染器信息
+                        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                        if (debugInfo) {
+                            result.renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                            result.vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+                        }
+                        
+                        // 基础信息
+                        result.version = gl.getParameter(gl.VERSION);
+                        result.shadingLanguageVersion = gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
+                        result.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+                    }
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+            
+            // 5. Canvas指纹
+            collectCanvasInfo() {
+                const result = {
+                    supported: false,
+                    fingerprint: null
+                };
+                
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 200;
+                    canvas.height = 50;
+                    const ctx = canvas.getContext('2d');
+                    
+                    if (ctx) {
+                        result.supported = true;
+                        
+                        // 绘制一些内容
+                        ctx.fillStyle = 'rgb(255, 0, 0)';
+                        ctx.fillRect(10, 10, 50, 50);
+                        
+                        ctx.fillStyle = 'rgba(0, 0, 255, 0.5)';
+                        ctx.font = '18px Arial';
+                        ctx.fillText('Canvas Test', 70, 30);
+                        
+                        // 获取图像数据
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                        
+                        // 生成简单指纹（前100个像素值之和）
+                        let sum = 0;
+                        for (let i = 0; i < Math.min(100, imageData.length); i++) {
+                            sum += imageData[i];
+                        }
+                        result.fingerprint = sum;
+                        
+                        // 测试功能支持
+                        result.features = {
+                            text: !!ctx.fillText,
+                            shadow: !!ctx.shadowBlur,
+                            gradient: !!ctx.createLinearGradient,
+                            imageSmoothing: ctx.imageSmoothingEnabled
+                        };
+                    }
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+            
+            // 6. 字体检测
+            async collectFontsInfo() {
+                const result = {
+                    detectedFonts: [],
+                    totalCount: 0
+                };
+                
+                try {
+                    // 常见字体列表
+                    const commonFonts = [
+                        'Arial', 'Arial Black', 'Arial Narrow', 
+                        'Times New Roman', 'Times', 
+                        'Courier New', 'Courier',
+                        'Verdana', 'Georgia', 
+                        'Palatino', 'Garamond',
+                        'Bookman', 'Comic Sans MS',
+                        'Trebuchet MS', 'Impact',
+                        'Tahoma', 'Geneva',
+                        'Helvetica', 'Helvetica Neue',
+                        'Lucida Console', 'Lucida Sans Unicode',
+                        'MS Sans Serif', 'MS Serif',
+                        'Symbol', 'Webdings',
+                        'Wingdings', 'Wingdings 2', 'Wingdings 3'
+                    ];
+                    
+                    // 检测哪些字体可用
+                    const availableFonts = [];
+                    
+                    // 创建测试元素
+                    const testElement = document.createElement('span');
+                    testElement.style.fontSize = '40px';
+                    testElement.style.position = 'absolute';
+                    testElement.style.left = '-9999px';
+                    testElement.innerHTML = 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm';
+                    document.body.appendChild(testElement);
+                    
+                    // 获取默认宽度
+                    const defaultWidth = testElement.offsetWidth;
+                    const defaultHeight = testElement.offsetHeight;
+                    
+                    // 测试每个字体
+                    for (const font of commonFonts) {
+                        testElement.style.fontFamily = `'${font}', monospace`;
+                        
+                        // 检查尺寸是否变化
+                        if (testElement.offsetWidth !== defaultWidth || testElement.offsetHeight !== defaultHeight) {
+                            availableFonts.push(font);
+                        }
+                    }
+                    
+                    // 清理
+                    document.body.removeChild(testElement);
+                    
+                    result.detectedFonts = availableFonts;
+                    result.totalCount = availableFonts.length;
+                    
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+            
+            // 7. 电池信息
+            async collectBatteryInfo() {
+                const result = {
+                    supported: false,
+                    level: null,
+                    charging: null
+                };
+                
+                try {
+                    if ('getBattery' in navigator) {
+                        const battery = await navigator.getBattery();
+                        result.supported = true;
+                        result.level = Math.round(battery.level * 100); // 百分比
+                        result.charging = battery.charging;
+                        result.chargingTime = battery.chargingTime;
+                        result.dischargingTime = battery.dischargingTime;
+                    }
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+            
+            // 8. 网络信息
+            collectNetworkInfo() {
+                const result = {
+                    online: navigator.onLine,
+                    connection: null
+                };
+                
+                try {
+                    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                    
+                    if (connection) {
+                        result.connection = {
+                            type: connection.type || 'unknown',
+                            effectiveType: connection.effectiveType || 'unknown',
+                            downlink: connection.downlink || 0,
+                            downlinkMax: connection.downlinkMax || 0,
+                            rtt: connection.rtt || 0,
+                            saveData: connection.saveData || false
+                        };
+                    }
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+            
+            // 9. 存储信息
+            collectStorageInfo() {
+                return {
+                    localStorage: !!window.localStorage,
+                    sessionStorage: !!window.sessionStorage,
+                    indexedDB: !!window.indexedDB,
+                    cookies: navigator.cookieEnabled,
+                    quota: 'storage' in navigator ? 'supported' : 'not supported'
+                };
+            }
+            
+            // 10. 插件信息
+            collectPluginsInfo() {
+                const result = {
+                    pluginCount: 0,
+                    plugins: []
+                };
+                
+                try {
+                    if (navigator.plugins && navigator.plugins.length > 0) {
+                        result.pluginCount = navigator.plugins.length;
+                        
+                        // 收集插件信息（限制数量）
+                        const pluginList = [];
+                        for (let i = 0; i < Math.min(navigator.plugins.length, 10); i++) {
+                            const plugin = navigator.plugins[i];
+                            pluginList.push({
+                                name: plugin.name,
+                                description: plugin.description,
+                                filename: plugin.filename,
+                                length: plugin.length
+                            });
+                        }
+                        result.plugins = pluginList;
+                    }
+                    
+                    // MIME类型
+                    if (navigator.mimeTypes && navigator.mimeTypes.length > 0) {
+                        result.mimeTypeCount = navigator.mimeTypes.length;
+                    }
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+            
+            // 11. 性能信息
+            collectPerformanceInfo() {
+                const result = {
+                    memory: null,
+                    timing: null
+                };
+                
+                try {
+                    // 内存信息（Chrome等浏览器）
+                    if (performance.memory) {
+                        result.memory = {
+                            usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + ' MB',
+                            totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + ' MB',
+                            jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + ' MB'
+                        };
+                    }
+                    
+                    // 导航计时
+                    if (performance.timing) {
+                        const timing = performance.timing;
+                        result.timing = {
+                            pageLoadTime: timing.loadEventEnd - timing.navigationStart,
+                            domReadyTime: timing.domContentLoadedEventEnd - timing.navigationStart,
+                            redirectCount: performance.navigation.redirectCount || 0,
+                            type: performance.navigation.type === 0 ? 'Normal navigation' : 
+                                  performance.navigation.type === 1 ? 'Reload' : 'Back/Forward'
+                        };
+                    }
+                } catch (e) {
+                    result.error = e.message;
+                }
+                
+                return result;
+            }
+            
+            // 12. 时间和时区信息
+            collectTimeInfo() {
+                return {
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    timezoneOffset: new Date().getTimezoneOffset(),
+                    locale: Intl.DateTimeFormat().resolvedOptions().locale,
+                    dateString: new Date().toString(),
+                    dateISOString: new Date().toISOString(),
+                    now: Date.now(),
+                    performanceNow: performance.now()
+                };
+            }
+        }
+        
+        // 全局函数，用于UI调用
+        window.getBrowserInfo = async function() {
+            const collector = new BrowserInfoCollector();
+            return await collector.collectAllInfo();
+        };
+        
+        // 状态显示函数
+        function showStatus(message, type = 'success') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+        }
+        
+        // 开始采集
+        async function startCollection() {
+            showStatus('正在收集浏览器信息...', 'success');
+            document.getElementById('output').textContent = '正在收集...';
+            
+            try {
+                const data = await window.getBrowserInfo();
+                document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+                showStatus('✅ 信息收集完成！', 'success');
+                
+                // 保存到全局变量以便后续使用
+                window.lastCollectionData = data;
+                
+            } catch (error) {
+                document.getElementById('output').textContent = '错误: ' + error.message;
+                showStatus('❌ 收集失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 显示摘要
+        function showSummary() {
+            if (!window.lastCollectionData) {
+                showStatus('请先收集信息', 'error');
+                return;
+            }
+            
+            const data = window.lastCollectionData;
+            const summaryContainer = document.getElementById('summaryContainer');
+            const summaryContent = document.getElementById('summaryContent');
+            
+            let html = '';
+            
+            // 创建摘要信息
+            if (data.basic) {
+                html += `<p><strong>浏览器:</strong> ${data.basic.userAgent.split(' ').slice(0, 3).join(' ')}</p>`;
+                html += `<p><strong>平台:</strong> ${data.basic.platform}</p>`;
+                html += `<p><strong>语言:</strong> ${data.basic.language}</p>`;
+                html += `<p><strong>在线状态:</strong> ${data.basic.onLine ? '在线' : '离线'}</p>`;
+            }
+            
+            if (data.screen) {
+                html += `<p><strong>屏幕分辨率:</strong> ${data.screen.width} × ${data.screen.height}</p>`;
+                html += `<p><strong>可用区域:</strong> ${data.screen.availWidth} × ${data.screen.availHeight}</p>`;
+                html += `<p><strong>色彩深度:</strong> ${data.screen.colorDepth} 位</p>`;
+            }
+            
+            if (data.webgl) {
+                html += `<p><strong>WebGL支持:</strong> ${data.webgl.supported ? '✅ 支持' : '❌ 不支持'}</p>`;
+            }
+            
+            if (data.canvas) {
+                html += `<p><strong>Canvas支持:</strong> ${data.canvas.supported ? '✅ 支持' : '❌ 不支持'}</p>`;
+            }
+            
+            if (data.fonts) {
+                html += `<p><strong>检测到字体数:</strong> ${data.fonts.totalCount || 0}</p>`;
+            }
+            
+            if (data.network && data.network.connection) {
+                html += `<p><strong>网络类型:</strong> ${data.network.connection.effectiveType}</p>`;
+                html += `<p><strong>下行速度:</strong> ${data.network.connection.downlink} Mbps</p>`;
+            }
+            
+            if (data.time) {
+                html += `<p><strong>时区:</strong> ${data.time.timezone}</p>`;
+            }
+            
+            if (data.battery) {
+                html += `<p><strong>电池支持:</strong> ${data.battery.supported ? '✅ 支持' : '❌ 不支持'}</p>`;
+                if (data.battery.supported) {
+                    html += `<p><strong>电池电量:</strong> ${data.battery.level}%</p>`;
+                    html += `<p><strong>充电状态:</strong> ${data.battery.charging ? '充电中' : '未充电'}</p>`;
+                }
+            }
+            
+            if (data.meta) {
+                html += `<p><strong>收集时间:</strong> ${data.meta.collectionTime}</p>`;
+            }
+            
+            summaryContent.innerHTML = html;
+            summaryContainer.style.display = 'block';
+            showStatus('摘要信息已显示', 'success');
+        }
+        
+        // 清空输出
+        function clearOutput() {
+            document.getElementById('output').textContent = '输出已清空';
+            document.getElementById('summaryContainer').style.display = 'none';
+            showStatus('输出已清空', 'success');
+        }
+        
+        // 导出JSON
+        function exportJSON() {
+            if (!window.lastCollectionData) {
+                showStatus('请先收集信息', 'error');
+                return;
+            }
+            
+            const dataStr = JSON.stringify(window.lastCollectionData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'browser-info-' + Date.now() + '.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showStatus('JSON文件已下载', 'success');
+        }
+        
+        // 页面加载完成后自动运行一次
+        document.addEventListener('DOMContentLoaded', function() {
+            // 5秒后自动运行
+            setTimeout(function() {
+                document.getElementById('output').textContent = '页面已加载，可以开始采集信息...';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
