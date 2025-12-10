@@ -130,7 +130,7 @@
 		}
 
 		getFullDeviceInfo().then((info) => {
-			console.log('info=' + JSON.stringify(info))
+			console.log('info=' + JSON.stringify(info, null, '\t'))
 		}).catch(console.error);
 
 	</script>
@@ -162,3 +162,4 @@
 </body>
 
 </html>
+
