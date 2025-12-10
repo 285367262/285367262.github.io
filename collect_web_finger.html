@@ -204,6 +204,8 @@
                     availHeight: screen.availHeight,
                     colorDepth: screen.colorDepth,
                     pixelDepth: screen.pixelDepth,
+                    ms_moz_Orientation: screen.msOrientation ||
+                          screen.mozOrientation || '',
                     orientation: screen.orientation ? {
                         type: screen.orientation.type,
                         angle: screen.orientation.angle
