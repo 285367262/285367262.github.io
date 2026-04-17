@@ -1,1531 +1,2874 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DNA Fingerprint Terminal</title>
-  <style>
-    :root {
-      --bg: #0a0a0f;
-      --bg-panel: #0f1119;
-      --bg-panel-alt: #131725;
-      --bg-code: #090c14;
-      --border: #1d2336;
-      --border-active: #00ff88;
-      --text: #d8dfeb;
-      --text-dim: #7f8aa3;
-      --green: #00ff88;
-      --cyan: #00d4ff;
-      --amber: #ffb000;
-      --red: #ff466c;
-      --shadow-green: 0 0 18px rgba(0, 255, 136, 0.18);
-      --shadow-cyan: 0 0 18px rgba(0, 212, 255, 0.18);
-      --radius: 8px;
-      --gap: 16px;
-      --mono: "Courier New", "Lucida Console", monospace;
-      --sans: "Segoe UI", system-ui, sans-serif;
-      --trans: 180ms ease;
-      --shell-pad: 14px;
-    }
-
-    * { box-sizing: border-box; }
-
-    html, body {
-      margin: 0;
-      min-height: 100%;
-      background:
-        radial-gradient(circle at top right, rgba(0, 212, 255, 0.08), transparent 28%),
-        radial-gradient(circle at top left, rgba(0, 255, 136, 0.06), transparent 24%),
-        var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-    }
-
-    body {
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background: repeating-linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.03) 0,
-        rgba(255,255,255,0.03) 1px,
-        transparent 1px,
-        transparent 4px
-      );
-      opacity: 0.08;
-      mix-blend-mode: screen;
-    }
-
-    body::after {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image: radial-gradient(rgba(255,255,255,0.08) 0.6px, transparent 0.6px);
-      background-size: 8px 8px;
-      opacity: 0.03;
-    }
-
-    .shell {
-      width: calc(100vw - (var(--shell-pad) * 2));
-      height: calc(100vh - (var(--shell-pad) * 2));
-      margin: var(--shell-pad) auto;
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      gap: var(--gap);
-      overflow: hidden;
-    }
-
-    .topbar {
-      flex-shrink: 0;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(280px, 0.6fr);
-      gap: var(--gap);
-      align-items: stretch;
-    }
-
-    .brand, .panel, .progress, .collectors {
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)) , var(--bg-panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: inset 0 0 24px rgba(0,255,136,0.025);
-      backdrop-filter: blur(8px);
-    }
-
-    .brand {
-      padding: 8px 12px;
-      overflow: hidden;
-      position: relative;
-      min-height: 100%;
-    }
-
-    .eyebrow {
-      display: none;
-    }
-
-    h1 {
-      margin: 0;
-      font: 700 clamp(20px, 2.5vw, 28px)/1 var(--mono);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #f3f8ff;
-      text-shadow: 0 0 14px rgba(0,212,255,0.22);
-    }
-
-    .subtitle {
-      display: none;
-    }
-
-    .controls {
-      min-width: 0;
-      padding: 8px 12px;
-      display: grid;
-      align-content: center;
-      gap: 8px;
-    }
-
-    .brand::before {
-      content: "";
-      position: absolute;
-      inset: -40% auto auto -10%;
-      width: 220px;
-      height: 220px;
-      background: radial-gradient(circle, rgba(0,255,136,0.18), transparent 60%);
-      filter: blur(16px);
-      pointer-events: none;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font: 700 11px/1 var(--mono);
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--green);
-      text-shadow: 0 0 8px rgba(0,255,136,0.35);
-      margin-bottom: 6px;
-    }
-
-    .eyebrow::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: var(--shadow-green);
-    }
-
-    h1 {
-      margin: 0;
-      font: 700 clamp(22px, 3vw, 36px)/1 var(--mono);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #f3f8ff;
-      text-shadow: 0 0 14px rgba(0,212,255,0.22);
-    }
-
-    .subtitle {
-      margin-top: 8px;
-      max-width: 80ch;
-      color: var(--text-dim);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-
-    .controls {
-      min-width: 0;
-      padding: 18px;
-      display: grid;
-      align-content: center;
-      gap: 14px;
-    }
-
-    .controls-row,
-    .chip-row,
-    .panel-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-
-    button {
-      appearance: none;
-      border: 1px solid var(--border);
-      background: #121728;
-      color: var(--text);
-      padding: 8px 14px;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: transform var(--trans), border-color var(--trans), box-shadow var(--trans), background var(--trans);
-      font: 700 11px/1 var(--mono);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    button:hover:not(:disabled) {
-      transform: translateY(-1px);
-      border-color: rgba(0,212,255,0.45);
-    }
-
-    button:disabled {
-      opacity: 0.35;
-      cursor: not-allowed;
-    }
-
-    .btn-run {
-      background: linear-gradient(90deg, rgba(0,255,136,0.18), rgba(0,212,255,0.12));
-      border-color: rgba(0,255,136,0.4);
-      color: #f7fffb;
-      box-shadow: var(--shadow-green);
-    }
-
-    .btn-danger { border-color: rgba(255,70,108,0.45); color: #ffd6df; }
-    .btn-copy { padding: 8px 12px; font-size: 11px; }
-
-    .chip {
-      border: 1px solid var(--border);
-      padding: 4px 10px;
-      border-radius: 999px;
-      font: 600 11px/1 var(--mono);
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      background: rgba(255,255,255,0.02);
-    }
-
-    .chip--green { color: var(--green); border-color: rgba(0,255,136,0.32); }
-    .chip--cyan { color: var(--cyan); border-color: rgba(0,212,255,0.32); }
-    .chip--amber { color: var(--amber); border-color: rgba(255,176,0,0.32); }
-    .chip--red { color: var(--red); border-color: rgba(255,70,108,0.32); }
-
-    .progress {
-      flex-shrink: 0;
-      padding: 6px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .hash-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 6px 10px;
-      background: var(--bg-panel-alt);
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-
-    .hash-label-inline {
-      font: 600 12px/1 var(--mono);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-    }
-
-    .hash-value {
-      font: 16px/1 var(--mono);
-      color: var(--green);
-      letter-spacing: 0.1em;
-      flex: 1;
-      min-width: 200px;
-    }
-
-    .btn-copy-sm {
-      padding: 3px 8px;
-      font-size: 9px;
-    }
-
-    .progress-head {
-      display: none;
-    }
-
-    .status-line {
-      display: none;
-    }
-
-    .cursor {
-      display: inline-block;
-      width: 10px;
-      height: 1em;
-      vertical-align: -2px;
-      background: var(--green);
-      margin-left: 6px;
-      box-shadow: var(--shadow-green);
-      animation: blink 1s steps(1) infinite;
-    }
-
-    .bar {
-      position: relative;
-      height: 14px;
-      border-radius: 999px;
-      overflow: hidden;
-      background: #0a0d14;
-      border: 1px solid var(--border);
-    }
-
-    .bar-fill {
-      width: 0%;
-      height: 100%;
-      background: linear-gradient(90deg, var(--green), var(--cyan));
-      box-shadow: 0 0 22px rgba(0,255,136,0.32);
-      transition: width 240ms ease;
-    }
-
-    .bottom-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .collectors {
-      flex-shrink: 0;
-      padding: 3px 8px;
-      height: auto;
-      max-height: 36px;
-      overflow: hidden;
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      min-height: 0;
-    }
-
-    .section-title {
-      display: none;
-    }
-
-    .badge-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 2px;
-    }
-
-    .badge {
-      border: 1px solid var(--border);
-      background: var(--bg-panel-alt);
-      border-radius: 999px;
-      padding: 1px 4px;
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      min-height: 14px;
-      font: 600 7px/1 var(--mono);
-      letter-spacing: 0.01em;
-      color: var(--text-dim);
-    }
-
-    .badge::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #46506b;
-    }
-
-    .badge.running { color: var(--amber); border-color: rgba(255,176,0,0.3); }
-    .badge.running::before { background: var(--amber); box-shadow: 0 0 10px rgba(255,176,0,0.55); animation: pulse 1s infinite; }
-    .badge.done { color: var(--green); border-color: rgba(0,255,136,0.3); }
-    .badge.done::before { background: var(--green); box-shadow: var(--shadow-green); }
-    .badge.error { color: var(--red); border-color: rgba(255,70,108,0.3); }
-    .badge.error::before { background: var(--red); box-shadow: 0 0 12px rgba(255,70,108,0.45); }
-    .badge.excluded { color: var(--cyan); border-color: rgba(0,212,255,0.22); }
-    .badge.excluded::before { background: var(--cyan); box-shadow: var(--shadow-cyan); }
-
-    .layout {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: var(--gap);
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .hash-strip {
-      flex-shrink: 0;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 12px;
-      align-items: start;
-      padding: 12px 16px;
-    }
-
-    .panel {
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)), var(--bg-panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: inset 0 0 24px rgba(0,255,136,0.025);
-      overflow: hidden;
-      position: relative;
-      min-height: 0;
-    }
-
-    .panel::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background: linear-gradient(180deg, rgba(0,255,136,0.02), transparent 18%, transparent 82%, rgba(0,212,255,0.03));
-      opacity: 0.9;
-    }
-
-    .hash-copy {
-      justify-self: end;
-    }
-
-    .hash-main {
-      display: grid;
-      align-items: start;
-      gap: 10px;
-      min-width: 0;
-      position: relative;
-      z-index: 1;
-    }
-
-    .hash-heading {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .hash-label {
-      margin: 0;
-      font: 700 13px/1 var(--mono);
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: #f5fbff;
-    }
-
-    .hash-subline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .workbench {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      grid-template-rows: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .panel-view {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .panel-head {
-      flex-shrink: 0;
-      padding: 6px 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      background: rgba(0,0,0,0.2);
-    }
-
-    .panel-actions {
-      display: none;
-    }
-
-    .panel-title {
-      margin: 0;
-      font: 700 13px/1 var(--mono);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--cyan);
-    }
-
-    .panel-step {
-      display: none;
-    }
-
-    .panel-meta {
-      flex-shrink: 0;
-      padding: 3px 10px;
-      background: rgba(0,0,0,0.15);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-    }
-
-    .panel-body {
-      flex: 1;
-      padding: 8px 10px;
-      overflow: auto;
-      position: relative;
-      z-index: 1;
-    }
-
-    .panel-copyhint {
-      color: var(--text-dim);
-      font: 11px/1.4 var(--mono);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      opacity: 0.8;
-    }
-
-    pre, .hash-box {
-      margin: 0;
-      width: 100%;
-      min-height: 100%;
-      overflow: auto;
-      resize: none;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,0.05);
-      background: var(--bg-code);
-      padding: 12px;
-      color: #dbe7f9;
-      font: 14px/1.4 var(--mono);
-      white-space: pre-wrap;
-      word-break: break-word;
-      box-shadow: inset 0 0 40px rgba(0, 212, 255, 0.03);
-    }
-
-    .hash-box {
-      height: auto;
-      min-height: 52px;
-      display: grid;
-      align-items: center;
-      font-size: clamp(15px, 1.2vw, 20px);
-      letter-spacing: 0.08em;
-      color: var(--green);
-      text-shadow: 0 0 14px rgba(0,255,136,0.3);
-      text-align: left;
-      padding: 12px 14px;
-      overflow: hidden;
-    }
-
-    #encryptedOutput {
-      color: #c8efff;
-      border-color: rgba(0,212,255,0.12);
-    }
-
-    #compressedOutput {
-      border-color: rgba(255,176,0,0.1);
-    }
-
-    .footnote {
-      flex-shrink: 0;
-      color: var(--text-dim);
-      font-size: 12px;
-      line-height: 1.6;
-      padding: 0 4px 4px;
-    }
-
-    @keyframes blink { 50% { opacity: 0; } }
-    @keyframes pulse { 50% { opacity: 0.35; } }
-
-    @media (max-width: 980px) {
-      .shell {
-        height: auto;
-        overflow: visible;
-      }
-      .topbar { grid-template-columns: 1fr; }
-      .layout { flex: none; height: auto; min-height: 400px; }
-      .workbench { grid-template-columns: 1fr; }
-      .collectors {
-        max-height: 240px;
-        height: auto;
-      }
-      .controls { min-width: 0; }
-      .panel-group { min-height: 420px; }
-    }
-
-    @media (max-width: 640px) {
-      :root { --shell-pad: 10px; }
-      .shell { width: calc(100vw - 20px); margin-top: 10px; }
-      .brand, .controls, .progress, .collectors, .panel-head, .panel-meta, .panel-body { padding-left: 12px; padding-right: 12px; }
-      h1 { font-size: 26px; }
-      .badge-grid { grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); }
-    }
-  </style>
-</head>
-<body>
-  <div class="shell">
-    <section class="topbar">
-      <div class="brand">
-        <div class="eyebrow">DNA Protocol Replica</div>
-        <h1>Fingerprint Terminal</h1>
-        <div class="subtitle">
-          收集原始指纹特征，展示数值映射后的 payload、MurmurHash3 摘要、LZString 压缩结果，以及
-          <code>encryptWithKeyIds</code> 输出。整套页面、算法、collector 编排和可视化都在同一 HTML 文件内运行。
+    <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <title>DNA Fingerprint Terminal</title>
+        <style>
+            :root {
+                --bg: #0a0a0f;
+                --bg-panel: #0f1119;
+                --bg-panel-alt: #131725;
+                --bg-code: #090c14;
+                --border: #1d2336;
+                --border-active: #00ff88;
+                --text: #d8dfeb;
+                --text-dim: #7f8aa3;
+                --green: #00ff88;
+                --cyan: #00d4ff;
+                --amber: #ffb000;
+                --red: #ff466c;
+                --shadow-green: 0 0 18px rgba(0, 255, 136, 0.18);
+                --shadow-cyan: 0 0 18px rgba(0, 212, 255, 0.18);
+                --radius: 8px;
+                --gap: 16px;
+                --mono: "Courier New", "Lucida Console", monospace;
+                --sans: "Segoe UI", system-ui, sans-serif;
+                --trans: 180ms ease;
+                --shell-pad: 14px;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            html, body {
+                margin: 0;
+                min-height: 100%;
+                background: radial-gradient(circle at top right, rgba(0, 212, 255, 0.08), transparent 28%), radial-gradient(circle at top left, rgba(0, 255, 136, 0.06), transparent 24%), var(--bg);
+                color: var(--text);
+                font-family: var(--sans);
+            }
+
+            body {
+                min-height: 100vh;
+                overflow-x: hidden;
+            }
+
+            body::before {
+                content: "";
+                position: fixed;
+                inset: 0;
+                pointer-events: none;
+                background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 0, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 4px);
+                opacity: 0.08;
+                mix-blend-mode: screen;
+            }
+
+            body::after {
+                content: "";
+                position: fixed;
+                inset: 0;
+                pointer-events: none;
+                background-image: radial-gradient(rgba(255, 255, 255, 0.08) 0.6px, transparent 0.6px);
+                background-size: 8px 8px;
+                opacity: 0.03;
+            }
+
+            .shell {
+                width: calc(100vw - (var(--shell-pad) * 2));
+                height: calc(100vh - (var(--shell-pad) * 2));
+                margin: var(--shell-pad) auto;
+                position: relative;
+                z-index: 1;
+                display: flex;
+                flex-direction: column;
+                gap: var(--gap);
+                overflow: hidden;
+            }
+
+            .topbar {
+                flex-shrink: 0;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(280px, 0.6fr);
+                gap: var(--gap);
+                align-items: stretch;
+            }
+
+            .brand, .panel, .progress, .collectors {
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)), var(--bg-panel);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                box-shadow: inset 0 0 24px rgba(0, 255, 136, 0.025);
+                backdrop-filter: blur(8px);
+            }
+
+            .brand {
+                padding: 8px 12px;
+                overflow: hidden;
+                position: relative;
+                min-height: 100%;
+            }
+
+            .eyebrow {
+                display: none;
+            }
+
+            h1 {
+                margin: 0;
+                font: 700 clamp(20px, 2.5vw, 28px)/1 var(--mono);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #f3f8ff;
+                text-shadow: 0 0 14px rgba(0, 212, 255, 0.22);
+            }
+
+            .subtitle {
+                display: none;
+            }
+
+            .controls {
+                min-width: 0;
+                padding: 8px 12px;
+                display: grid;
+                align-content: center;
+                gap: 8px;
+            }
+
+            .brand::before {
+                content: "";
+                position: absolute;
+                inset: -40% auto auto -10%;
+                width: 220px;
+                height: 220px;
+                background: radial-gradient(circle, rgba(0, 255, 136, 0.18), transparent 60%);
+                filter: blur(16px);
+                pointer-events: none;
+            }
+
+            .eyebrow {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                font: 700 11px/1 var(--mono);
+                letter-spacing: 0.18em;
+                text-transform: uppercase;
+                color: var(--green);
+                text-shadow: 0 0 8px rgba(0, 255, 136, 0.35);
+                margin-bottom: 6px;
+            }
+
+            .eyebrow::before {
+                content: "";
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--green);
+                box-shadow: var(--shadow-green);
+            }
+
+            h1 {
+                margin: 0;
+                font: 700 clamp(22px, 3vw, 36px)/1 var(--mono);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #f3f8ff;
+                text-shadow: 0 0 14px rgba(0, 212, 255, 0.22);
+            }
+
+            .subtitle {
+                margin-top: 8px;
+                max-width: 80ch;
+                color: var(--text-dim);
+                font-size: 12px;
+                line-height: 1.5;
+            }
+
+            .controls {
+                min-width: 0;
+                padding: 18px;
+                display: grid;
+                align-content: center;
+                gap: 14px;
+            }
+
+            .controls-row, .chip-row, .panel-meta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+            }
+
+            button {
+                appearance: none;
+                border: 1px solid var(--border);
+                background: #121728;
+                color: var(--text);
+                padding: 8px 14px;
+                border-radius: 999px;
+                cursor: pointer;
+                transition: transform var(--trans), border-color var(--trans), box-shadow var(--trans), background var(--trans);
+                font: 700 11px/1 var(--mono);
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+
+            button:hover:not(:disabled) {
+                transform: translateY(-1px);
+                border-color: rgba(0, 212, 255, 0.45);
+            }
+
+            button:disabled {
+                opacity: 0.35;
+                cursor: not-allowed;
+            }
+
+            .btn-run {
+                background: linear-gradient(90deg, rgba(0, 255, 136, 0.18), rgba(0, 212, 255, 0.12));
+                border-color: rgba(0, 255, 136, 0.4);
+                color: #f7fffb;
+                box-shadow: var(--shadow-green);
+            }
+
+            .btn-danger {
+                border-color: rgba(255, 70, 108, 0.45);
+                color: #ffd6df;
+            }
+
+            .btn-export {
+                border-color: rgba(138, 180, 248, 0.45);
+                color: #e8f0ff;
+                background: rgba(138, 180, 248, 0.08);
+            }
+
+            .btn-export:not(:disabled):hover {
+                background: rgba(138, 180, 248, 0.18);
+                border-color: rgba(138, 180, 248, 0.6);
+            }
+
+            .btn-copy {
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+
+            .chip {
+                border: 1px solid var(--border);
+                padding: 4px 10px;
+                border-radius: 999px;
+                font: 600 11px/1 var(--mono);
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .chip--green {
+                color: var(--green);
+                border-color: rgba(0, 255, 136, 0.32);
+            }
+
+            .chip--cyan {
+                color: var(--cyan);
+                border-color: rgba(0, 212, 255, 0.32);
+            }
+
+            .chip--amber {
+                color: var(--amber);
+                border-color: rgba(255, 176, 0, 0.32);
+            }
+
+            .chip--red {
+                color: var(--red);
+                border-color: rgba(255, 70, 108, 0.32);
+            }
+
+            .progress {
+                flex-shrink: 0;
+                padding: 6px 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .hash-bar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 6px 10px;
+                background: var(--bg-panel-alt);
+                border-radius: 6px;
+                border: 1px solid var(--border);
+                flex-wrap: wrap;
+            }
+
+            .hash-label-inline {
+                font: 600 12px/1 var(--mono);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+            }
+
+            .hash-value {
+                font: 16px/1 var(--mono);
+                color: var(--green);
+                letter-spacing: 0.1em;
+                flex: 1;
+                min-width: 200px;
+            }
+
+            .btn-copy-sm {
+                padding: 3px 8px;
+                font-size: 9px;
+            }
+
+            .progress-head {
+                display: none;
+            }
+
+            .status-line {
+                display: none;
+            }
+
+            .cursor {
+                display: inline-block;
+                width: 10px;
+                height: 1em;
+                vertical-align: -2px;
+                background: var(--green);
+                margin-left: 6px;
+                box-shadow: var(--shadow-green);
+                animation: blink 1s steps(1) infinite;
+            }
+
+            .bar {
+                position: relative;
+                height: 14px;
+                border-radius: 999px;
+                overflow: hidden;
+                background: #0a0d14;
+                border: 1px solid var(--border);
+            }
+
+            .bar-fill {
+                width: 0%;
+                height: 100%;
+                background: linear-gradient(90deg, var(--green), var(--cyan));
+                box-shadow: 0 0 22px rgba(0, 255, 136, 0.32);
+                transition: width 240ms ease;
+            }
+
+            .bottom-area {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            .collectors {
+                flex-shrink: 0;
+                padding: 3px 8px;
+                height: auto;
+                max-height: 36px;
+                overflow: hidden;
+                display: grid;
+                grid-template-rows: auto minmax(0, 1fr);
+                min-height: 0;
+            }
+
+            .section-title {
+                display: none;
+            }
+
+            .badge-grid {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 2px;
+            }
+
+            .badge {
+                border: 1px solid var(--border);
+                background: var(--bg-panel-alt);
+                border-radius: 999px;
+                padding: 1px 4px;
+                display: inline-flex;
+                align-items: center;
+                gap: 2px;
+                min-height: 14px;
+                font: 600 7px/1 var(--mono);
+                letter-spacing: 0.01em;
+                color: var(--text-dim);
+            }
+
+            .badge::before {
+                content: "";
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #46506b;
+            }
+
+            .badge.running {
+                color: var(--amber);
+                border-color: rgba(255, 176, 0, 0.3);
+            }
+
+            .badge.running::before {
+                background: var(--amber);
+                box-shadow: 0 0 10px rgba(255, 176, 0, 0.55);
+                animation: pulse 1s infinite;
+            }
+
+            .badge.done {
+                color: var(--green);
+                border-color: rgba(0, 255, 136, 0.3);
+            }
+
+            .badge.done::before {
+                background: var(--green);
+                box-shadow: var(--shadow-green);
+            }
+
+            .badge.error {
+                color: var(--red);
+                border-color: rgba(255, 70, 108, 0.3);
+            }
+
+            .badge.error::before {
+                background: var(--red);
+                box-shadow: 0 0 12px rgba(255, 70, 108, 0.45);
+            }
+
+            .badge.excluded {
+                color: var(--cyan);
+                border-color: rgba(0, 212, 255, 0.22);
+            }
+
+            .badge.excluded::before {
+                background: var(--cyan);
+                box-shadow: var(--shadow-cyan);
+            }
+
+            .layout {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: var(--gap);
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            .hash-strip {
+                flex-shrink: 0;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 12px;
+                align-items: start;
+                padding: 12px 16px;
+            }
+
+            .panel {
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)), var(--bg-panel);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                box-shadow: inset 0 0 24px rgba(0, 255, 136, 0.025);
+                overflow: hidden;
+                position: relative;
+                min-height: 0;
+            }
+
+            .panel::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                background: linear-gradient(180deg, rgba(0, 255, 136, 0.02), transparent 18%, transparent 82%, rgba(0, 212, 255, 0.03));
+                opacity: 0.9;
+            }
+
+            .hash-copy {
+                justify-self: end;
+            }
+
+            .hash-main {
+                display: grid;
+                align-items: start;
+                gap: 10px;
+                min-width: 0;
+                position: relative;
+                z-index: 1;
+            }
+
+            .hash-heading {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .hash-label {
+                margin: 0;
+                font: 700 13px/1 var(--mono);
+                letter-spacing: 0.16em;
+                text-transform: uppercase;
+                color: #f5fbff;
+            }
+
+            .hash-subline {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .workbench {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                flex: 1;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            .panel-view {
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            .panel-head {
+                flex-shrink: 0;
+                padding: 6px 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+                background: rgba(0, 0, 0, 0.2);
+            }
+
+            .panel-actions {
+                display: none;
+            }
+
+            .panel-title {
+                margin: 0;
+                font: 700 13px/1 var(--mono);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--cyan);
+            }
+
+            .panel-step {
+                display: none;
+            }
+
+            .panel-meta {
+                flex-shrink: 0;
+                padding: 3px 10px;
+                background: rgba(0, 0, 0, 0.15);
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                align-items: center;
+            }
+
+            .panel-body {
+                flex: 1;
+                padding: 8px 10px;
+                overflow: auto;
+                position: relative;
+                z-index: 1;
+            }
+
+            .panel-copyhint {
+                color: var(--text-dim);
+                font: 11px/1.4 var(--mono);
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                opacity: 0.8;
+            }
+
+            pre, .hash-box {
+                margin: 0;
+                width: 100%;
+                min-height: 100%;
+                overflow: auto;
+                resize: none;
+                border-radius: 4px;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                background: var(--bg-code);
+                padding: 12px;
+                color: #dbe7f9;
+                font: 14px/1.4 var(--mono);
+                white-space: pre-wrap;
+                word-break: break-word;
+                box-shadow: inset 0 0 40px rgba(0, 212, 255, 0.03);
+            }
+
+            .hash-box {
+                height: auto;
+                min-height: 52px;
+                display: grid;
+                align-items: center;
+                font-size: clamp(15px, 1.2vw, 20px);
+                letter-spacing: 0.08em;
+                color: var(--green);
+                text-shadow: 0 0 14px rgba(0, 255, 136, 0.3);
+                text-align: left;
+                padding: 12px 14px;
+                overflow: hidden;
+            }
+
+            #encryptedOutput {
+                color: #c8efff;
+                border-color: rgba(0, 212, 255, 0.12);
+            }
+
+            #compressedOutput {
+                border-color: rgba(255, 176, 0, 0.1);
+            }
+
+            .footnote {
+                flex-shrink: 0;
+                color: var(--text-dim);
+                font-size: 12px;
+                line-height: 1.6;
+                padding: 0 4px 4px;
+            }
+
+            @keyframes blink {
+                50% {
+                    opacity: 0;
+                }
+            }
+
+            @keyframes pulse {
+                50% {
+                    opacity: 0.35;
+                }
+            }
+
+            @media (max-width: 980px) {
+                .shell {
+                    height: auto;
+                    overflow: visible;
+                }
+
+                .topbar {
+                    grid-template-columns: 1fr;
+                }
+
+                .layout {
+                    flex: none;
+                    height: auto;
+                    min-height: 400px;
+                }
+
+                .workbench {
+                    grid-template-columns: 1fr;
+                }
+
+                .collectors {
+                    max-height: 240px;
+                    height: auto;
+                }
+
+                .controls {
+                    min-width: 0;
+                }
+
+                .panel-group {
+                    min-height: 420px;
+                }
+            }
+
+            @media (max-width: 640px) {
+                :root {
+                    --shell-pad: 10px;
+                }
+
+                .shell {
+                    width: calc(100vw - 20px);
+                    margin-top: 10px;
+                }
+
+                .brand, .controls, .progress, .collectors, .panel-head, .panel-meta, .panel-body {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                }
+
+                h1 {
+                    font-size: 26px;
+                }
+
+                .badge-grid {
+                    grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="shell">
+            <section class="topbar">
+                <div class="brand">
+                    <div class="eyebrow">DNA Protocol Replica</div>
+                    <h1>Fingerprint Terminal</h1>
+                    <div class="subtitle">
+                        收集原始指纹特征，展示数值映射后的 payload、MurmurHash3 摘要、LZString 压缩结果，以及
+          <code>encryptWithKeyIds</code>
+                        输出。整套页面、算法、collector 编排和可视化都在同一 HTML 文件内运行。
+        
+                    </div>
+                </div>
+                <div class="controls brand">
+                    <div class="controls-row">
+                        <button id="runBtn" class="btn-run">Run Capture</button>
+                        <button id="stopBtn" class="btn-danger" disabled>Stop</button>
+                        <button id="resetBtn">Reset</button>
+                        <button id="exportBtn" class="btn-export" disabled>Export All</button>
+                    </div>
+                    <div class="chip-row">
+                        <span class="chip chip--green" id="sessionChip">Idle</span>
+                        <span class="chip chip--cyan" id="elapsedChip">0 ms</span>
+                        <span class="chip chip--amber" id="collectorChip">0 / 0</span>
+                    </div>
+                </div>
+            </section>
+            <section class="progress">
+                <div class="progress-head">
+                    <div class="progress-label">Collection Progress</div>
+                    <div class="chip-row">
+                        <span class="chip chip--amber" id="phaseChip">Waiting</span>
+                        <span class="chip chip--cyan" id="currentCollectorChip">—</span>
+                    </div>
+                </div>
+                <div class="bar">
+                    <div id="progressFill" class="bar-fill"></div>
+                </div>
+                <div class="status-line" id="statusLine">
+                    Ready<span class="cursor"></span>
+                </div>
+                <div class="hash-bar">
+                    <span class="hash-label-inline">Murmur3 x64_128</span>
+                    <span class="chip chip--green" id="hashLengthChip">0 chars</span>
+                    <span class="chip" id="hashTimeChip">—</span>
+                    <code class="hash-value" id="hashOutput">—</code>
+                    <button class="btn-copy btn-copy-sm" data-target="hashOutput">Copy</button>
+                </div>
+            </section>
+            <div class="bottom-area">
+                <section class="collectors">
+                    <h2 class="section-title">Collector Status Matrix</h2>
+                    <div id="collectorGrid" class="badge-grid"></div>
+                </section>
+                <div class="workbench">
+                    <section class="panel-view active">
+                        <div class="panel-head">
+                            <div>
+                                <h3 class="panel-title">Raw Features</h3>
+                                <div class="panel-step">Stage 01 · Collector output</div>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="btn-copy" data-target="rawOutput">Copy</button>
+                            </div>
+                        </div>
+                        <div class="panel-meta">
+                            <span class="chip chip--cyan" id="rawCountChip">0 keys</span>
+                            <span class="chip" id="rawTimeChip">—</span>
+                        </div>
+                        <div class="panel-body">
+                            <pre id="rawOutput">{}</pre>
+                        </div>
+                    </section>
+                    <section class="panel-view active">
+                        <div class="panel-head">
+                            <div>
+                                <h3 class="panel-title">Mapped Payload</h3>
+                                <div class="panel-step">Stage 02 · Numeric remapping</div>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="btn-copy" data-target="mappedOutput">Copy</button>
+                            </div>
+                        </div>
+                        <div class="panel-meta">
+                            <span class="chip chip--green" id="mappedCountChip">0 keys</span>
+                            <span class="chip" id="mappedTimeChip">—</span>
+                        </div>
+                        <div class="panel-body">
+                            <pre id="mappedOutput">{}</pre>
+                        </div>
+                    </section>
+                    <section class="panel-view active">
+                        <div class="panel-head">
+                            <div>
+                                <h3 class="panel-title">Compressed Payload</h3>
+                                <div class="panel-step">Stage 04 · LZString Base64</div>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="btn-copy" data-target="compressedOutput">Copy</button>
+                            </div>
+                        </div>
+                        <div class="panel-meta">
+                            <span class="chip chip--amber" id="compressedSizeChip">0 bytes</span>
+                            <span class="chip" id="compressTimeChip">—</span>
+                        </div>
+                        <div class="panel-body">
+                            <pre id="compressedOutput"></pre>
+                        </div>
+                    </section>
+                    <section class="panel-view active">
+                        <div class="panel-head">
+                            <div>
+                                <h3 class="panel-title">Encrypted Output</h3>
+                                <div class="panel-step">Stage 05 · RSA-OAEP + AES-CBC</div>
+                            </div>
+                            <div class="panel-actions">
+                                <button class="btn-copy" data-target="encryptedOutput">Copy</button>
+                            </div>
+                        </div>
+                        <div class="panel-meta">
+                            <span class="chip chip--cyan" id="encryptedSizeChip">0 bytes</span>
+                            <span class="chip" id="encryptTimeChip">—</span>
+                        </div>
+                        <div class="panel-body">
+                            <pre id="encryptedOutput"></pre>
+                        </div>
+                    </section>
+                </div>
+            </div>
         </div>
-      </div>
-
-      <div class="controls brand">
-        <div class="controls-row">
-          <button id="runBtn" class="btn-run">Run Capture</button>
-          <button id="stopBtn" class="btn-danger" disabled>Stop</button>
-          <button id="resetBtn">Reset</button>
+        <div class="footnote">
+            Default exclusions will follow DNA.js: <code>pixelRatio</code>
+            , <code>doNotTrack</code>
+            , <code>fontsFlash</code>
+            .
+    The page now runs end-to-end in-place.
         </div>
-        <div class="chip-row">
-          <span class="chip chip--green" id="sessionChip">Idle</span>
-          <span class="chip chip--cyan" id="elapsedChip">0 ms</span>
-          <span class="chip chip--amber" id="collectorChip">0 / 0</span>
-        </div>
-      </div>
-    </section>
+<script>
+    let capturedData = null;
 
-    <section class="progress">
-      <div class="progress-head">
-        <div class="progress-label">Collection Progress</div>
-        <div class="chip-row">
-          <span class="chip chip--amber" id="phaseChip">Waiting</span>
-          <span class="chip chip--cyan" id="currentCollectorChip">—</span>
-        </div>
-      </div>
-      <div class="bar"><div id="progressFill" class="bar-fill"></div></div>
-      <div class="status-line" id="statusLine">Ready<span class="cursor"></span></div>
-      <div class="hash-bar">
-        <span class="hash-label-inline">Murmur3 x64_128</span>
-        <span class="chip chip--green" id="hashLengthChip">0 chars</span>
-        <span class="chip" id="hashTimeChip">—</span>
-        <code class="hash-value" id="hashOutput">—</code>
-        <button class="btn-copy btn-copy-sm" data-target="hashOutput">Copy</button>
-      </div>
-    </section>
-
-    <div class="bottom-area">
-      <section class="collectors">
-        <h2 class="section-title">Collector Status Matrix</h2>
-        <div id="collectorGrid" class="badge-grid"></div>
-      </section>
-
-      <div class="workbench">
-        <section class="panel-view active">
-          <div class="panel-head">
-            <div>
-              <h3 class="panel-title">Raw Features</h3>
-              <div class="panel-step">Stage 01 · Collector output</div>
-            </div>
-            <div class="panel-actions">
-              <button class="btn-copy" data-target="rawOutput">Copy</button>
-            </div>
-          </div>
-          <div class="panel-meta">
-            <span class="chip chip--cyan" id="rawCountChip">0 keys</span>
-            <span class="chip" id="rawTimeChip">—</span>
-          </div>
-          <div class="panel-body"><pre id="rawOutput">{}</pre></div>
-        </section>
-
-        <section class="panel-view active">
-          <div class="panel-head">
-            <div>
-              <h3 class="panel-title">Mapped Payload</h3>
-              <div class="panel-step">Stage 02 · Numeric remapping</div>
-            </div>
-            <div class="panel-actions">
-              <button class="btn-copy" data-target="mappedOutput">Copy</button>
-            </div>
-          </div>
-          <div class="panel-meta">
-            <span class="chip chip--green" id="mappedCountChip">0 keys</span>
-              <span class="chip" id="mappedTimeChip">—</span>
-            </div>
-            <div class="panel-body"><pre id="mappedOutput">{}</pre></div>
-          </section>
-
-          <section class="panel-view active">
-            <div class="panel-head">
-              <div>
-                <h3 class="panel-title">Compressed Payload</h3>
-                <div class="panel-step">Stage 04 · LZString Base64</div>
-              </div>
-              <div class="panel-actions">
-                <button class="btn-copy" data-target="compressedOutput">Copy</button>
-              </div>
-            </div>
-            <div class="panel-meta">
-              <span class="chip chip--amber" id="compressedSizeChip">0 bytes</span>
-              <span class="chip" id="compressTimeChip">—</span>
-            </div>
-            <div class="panel-body"><pre id="compressedOutput"></pre></div>
-          </section>
-
-          <section class="panel-view active">
-            <div class="panel-head">
-              <div>
-                <h3 class="panel-title">Encrypted Output</h3>
-                <div class="panel-step">Stage 05 · RSA-OAEP + AES-CBC</div>
-              </div>
-              <div class="panel-actions">
-                <button class="btn-copy" data-target="encryptedOutput">Copy</button>
-              </div>
-            </div>
-            <div class="panel-meta">
-              <span class="chip chip--cyan" id="encryptedSizeChip">0 bytes</span>
-              <span class="chip" id="encryptTimeChip">—</span>
-            </div>
-            <div class="panel-body"><pre id="encryptedOutput"></pre></div>
-          </section>
-        </div>
-      </div>
-    </div>
-
-    <div class="footnote">
-      Default exclusions will follow DNA.js: <code>pixelRatio</code>, <code>doNotTrack</code>, <code>fontsFlash</code>.
-      The page now runs end-to-end in-place.
-    </div>
-  </div>
-
-  <script>
     const ui = {
-      runBtn: document.getElementById('runBtn'),
-      stopBtn: document.getElementById('stopBtn'),
-      resetBtn: document.getElementById('resetBtn'),
-      sessionChip: document.getElementById('sessionChip'),
-      elapsedChip: document.getElementById('elapsedChip'),
-      collectorChip: document.getElementById('collectorChip'),
-      phaseChip: document.getElementById('phaseChip'),
-      currentCollectorChip: document.getElementById('currentCollectorChip'),
-      progressFill: document.getElementById('progressFill'),
-      statusLine: document.getElementById('statusLine'),
-      collectorGrid: document.getElementById('collectorGrid'),
-      rawOutput: document.getElementById('rawOutput'),
-      mappedOutput: document.getElementById('mappedOutput'),
-      hashOutput: document.getElementById('hashOutput'),
-      compressedOutput: document.getElementById('compressedOutput'),
-      encryptedOutput: document.getElementById('encryptedOutput'),
-      rawCountChip: document.getElementById('rawCountChip'),
-      rawTimeChip: document.getElementById('rawTimeChip'),
-      mappedCountChip: document.getElementById('mappedCountChip'),
-      mappedTimeChip: document.getElementById('mappedTimeChip'),
-      hashLengthChip: document.getElementById('hashLengthChip'),
-      hashTimeChip: document.getElementById('hashTimeChip'),
-      compressedSizeChip: document.getElementById('compressedSizeChip'),
-      compressTimeChip: document.getElementById('compressTimeChip'),
-      encryptedSizeChip: document.getElementById('encryptedSizeChip'),
-      encryptTimeChip: document.getElementById('encryptTimeChip')
+        runBtn: document.getElementById('runBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        exportBtn: document.getElementById('exportBtn'),
+        sessionChip: document.getElementById('sessionChip'),
+        elapsedChip: document.getElementById('elapsedChip'),
+        collectorChip: document.getElementById('collectorChip'),
+        phaseChip: document.getElementById('phaseChip'),
+        currentCollectorChip: document.getElementById('currentCollectorChip'),
+        progressFill: document.getElementById('progressFill'),
+        statusLine: document.getElementById('statusLine'),
+        collectorGrid: document.getElementById('collectorGrid'),
+        rawOutput: document.getElementById('rawOutput'),
+        mappedOutput: document.getElementById('mappedOutput'),
+        hashOutput: document.getElementById('hashOutput'),
+        compressedOutput: document.getElementById('compressedOutput'),
+        encryptedOutput: document.getElementById('encryptedOutput'),
+        rawCountChip: document.getElementById('rawCountChip'),
+        rawTimeChip: document.getElementById('rawTimeChip'),
+        mappedCountChip: document.getElementById('mappedCountChip'),
+        mappedTimeChip: document.getElementById('mappedTimeChip'),
+        hashLengthChip: document.getElementById('hashLengthChip'),
+        hashTimeChip: document.getElementById('hashTimeChip'),
+        compressedSizeChip: document.getElementById('compressedSizeChip'),
+        compressTimeChip: document.getElementById('compressTimeChip'),
+        encryptedSizeChip: document.getElementById('encryptedSizeChip'),
+        encryptTimeChip: document.getElementById('encryptTimeChip')
     };
 
     const DEFAULTS = {
-      preprocessor: null,
-      audio: { timeout: 1000, excludeIOS11: true },
-      fonts: { swfContainerId: 'apfcDf', swfPath: 'flash/compiled/FontList.swf', userDefinedFonts: [], extendedJsFonts: void 0, hashOnly: false },
-      screen: { detectScreenOrientation: true },
-      plugins: { sortPluginsFor: [/palemoon/i], excludeIE: false },
-      webgl: { hashOnly: false },
-      excludes: { pixelRatio: true, doNotTrack: true, fontsFlash: true },
-      debug: false,
-      NOT_AVAILABLE: 'n/a',
-      ERROR: 'err',
-      EXCLUDED: 'excluded',
-      useRequestIdleCallBack: true
+        preprocessor: null,
+        audio: {
+            timeout: 1000,
+            excludeIOS11: true
+        },
+        fonts: {
+            swfContainerId: 'apfcDf',
+            swfPath: 'flash/compiled/FontList.swf',
+            userDefinedFonts: [],
+            extendedJsFonts: void 0,
+            hashOnly: false
+        },
+        screen: {
+            detectScreenOrientation: true
+        },
+        plugins: {
+            sortPluginsFor: [/palemoon/i],
+            excludeIE: false
+        },
+        webgl: {
+            hashOnly: false
+        },
+        excludes: {
+            pixelRatio: true,
+            doNotTrack: true,
+            fontsFlash: true
+        },
+        debug: false,
+        NOT_AVAILABLE: 'n/a',
+        ERROR: 'err',
+        EXCLUDED: 'excluded',
+        useRequestIdleCallBack: true
     };
 
-    const h = { apfcTypes: 1, collectionType: 2, trackingId: 3 };
-    const f = { protocol: 1, hostname: 2, port: 3, origin: 4, host: 5, href: 6, hash: 7, pathname: 8 };
-    const p = { saveData: 1, effectiveType: 2, rtt: 3, downlink: 4, downlinkMax: 5, type: 6 };
-    const g = { liedOS: 1, liedBrowser: 2, liedResolution: 3, adBlockInstalled: 4, liedLanguages: 5 };
-    const v = { type: 1, description: 2, suffixes: 3 };
-    const m = { canvasHash: 1, canvasWinding: 2 };
-    const y = { label: 1, gid: 2, id: 3, kind: 4 };
-    const E = { lists: 1, fontsHash: 2 };
-    const b = { Orientation: 1, Enabled: 2 };
-    const w = { charging: 1, dischargingTime: 2, level: 3, chargingTime: 4 };
-    const T = { touchStart: 1, touchEvent: 2, maxTouchPoints: 3 };
+    const h = {
+        apfcTypes: 1,
+        collectionType: 2,
+        trackingId: 3
+    };
+    const f = {
+        protocol: 1,
+        hostname: 2,
+        port: 3,
+        origin: 4,
+        host: 5,
+        href: 6,
+        hash: 7,
+        pathname: 8
+    };
+    const p = {
+        saveData: 1,
+        effectiveType: 2,
+        rtt: 3,
+        downlink: 4,
+        downlinkMax: 5,
+        type: 6
+    };
+    const g = {
+        liedOS: 1,
+        liedBrowser: 2,
+        liedResolution: 3,
+        adBlockInstalled: 4,
+        liedLanguages: 5
+    };
+    const v = {
+        type: 1,
+        description: 2,
+        suffixes: 3
+    };
+    const m = {
+        canvasHash: 1,
+        canvasWinding: 2
+    };
+    const y = {
+        label: 1,
+        gid: 2,
+        id: 3,
+        kind: 4
+    };
+    const E = {
+        lists: 1,
+        fontsHash: 2
+    };
+    const b = {
+        Orientation: 1,
+        Enabled: 2
+    };
+    const w = {
+        charging: 1,
+        dischargingTime: 2,
+        level: 3,
+        chargingTime: 4
+    };
+    const T = {
+        touchStart: 1,
+        touchEvent: 2,
+        maxTouchPoints: 3
+    };
     const _ = {
-      'webgl stencil bits': 1, 'webgl vertex shader high float precision rangeMax': 2, 'webgl antialiasing': 3,
-      'webgl max vertex texture image units': 4, 'webgl fragment shader medium int precision rangeMax': 5,
-      'webgl fragment shader low int precision rangeMin': 6, 'webgl max vertex uniform vectors': 7,
-      'webgl renderer': 8, 'webgl vertex shader high float precision': 9, 'webgl green bits': 10,
-      'webgl fragment shader medium int precision rangeMin': 11, 'webgl fragment shader low int precision rangeMax': 12,
-      'webgl fragment shader medium int precision': 13, 'webgl blue bits': 14, 'webgl max viewport dims': 15,
-      'webgl unmasked vendor': 16, 'webgl vertex shader medium float precision': 17, 'webgl fragment shader low int precision': 18,
-      'webgl vertex shader high int precision': 19, 'webgl vertex shader medium int precision rangeMax': 20,
-      'webgl unmasked renderer': 21, 'webgl fragment shader high int precision': 22, 'webgl aliased point size range': 23,
-      'webgl vertex shader medium float precision rangeMax': 24, 'webgl vertex shader low int precision rangeMax': 25,
-      'webgl fragment shader low float precision': 26, 'webgl fragment shader high int precision rangeMin': 27,
-      'webgl vertex shader high float precision rangeMin': 28, 'webgl red bits': 29, vendorAndRenderer: 30,
-      'webgl vertex shader medium int precision rangeMin': 31, 'webgl vertex shader low float precision': 32,
-      'webgl vertex shader medium int precision': 33, 'webgl fragment shader medium float precision rangeMax': 34,
-      'webgl max texture image units': 35, 'webgl vertex shader medium float precision rangeMin': 36,
-      'webgl fragment shader high float precision rangeMin': 37, 'webgl fragment shader high int precision rangeMax': 38,
-      'webgl vertex shader high int precision rangeMax': 39, webglHash: 40, 'webgl max varying vectors': 41,
-      'webgl fragment shader medium float precision rangeMin': 42, 'webgl vertex shader low int precision': 43,
-      'webgl fragment shader low float precision rangeMin': 44, 'webgl aliased line width range': 45,
-      'webgl max combined texture image units': 46, 'webgl shading language version': 47,
-      'webgl vertex shader high int precision rangeMin': 48, 'webgl max anisotropy': 49, 'webgl max render buffer size': 50,
-      'webgl vendor': 51, 'webgl vertex shader low int precision rangeMin': 52, 'webgl max fragment uniform vectors': 53,
-      'webgl fragment shader high float precision rangeMax': 54, 'webgl version': 55, 'webgl fragment shader high float precision': 56,
-      'webgl max texture size': 57, 'webgl max cube map texture size': 58, 'webgl fragment shader medium float precision': 59,
-      'webgl vertex shader low float precision rangeMin': 60, 'webgl max vertex attribs': 61, 'webgl alpha bits': 62,
-      'webgl vertex shader low float precision rangeMax': 63, 'webgl fragment shader low float precision rangeMax': 64,
-      'webgl depth bits': 65, extensions: 66
+        'webgl stencil bits': 1,
+        'webgl vertex shader high float precision rangeMax': 2,
+        'webgl antialiasing': 3,
+        'webgl max vertex texture image units': 4,
+        'webgl fragment shader medium int precision rangeMax': 5,
+        'webgl fragment shader low int precision rangeMin': 6,
+        'webgl max vertex uniform vectors': 7,
+        'webgl renderer': 8,
+        'webgl vertex shader high float precision': 9,
+        'webgl green bits': 10,
+        'webgl fragment shader medium int precision rangeMin': 11,
+        'webgl fragment shader low int precision rangeMax': 12,
+        'webgl fragment shader medium int precision': 13,
+        'webgl blue bits': 14,
+        'webgl max viewport dims': 15,
+        'webgl unmasked vendor': 16,
+        'webgl vertex shader medium float precision': 17,
+        'webgl fragment shader low int precision': 18,
+        'webgl vertex shader high int precision': 19,
+        'webgl vertex shader medium int precision rangeMax': 20,
+        'webgl unmasked renderer': 21,
+        'webgl fragment shader high int precision': 22,
+        'webgl aliased point size range': 23,
+        'webgl vertex shader medium float precision rangeMax': 24,
+        'webgl vertex shader low int precision rangeMax': 25,
+        'webgl fragment shader low float precision': 26,
+        'webgl fragment shader high int precision rangeMin': 27,
+        'webgl vertex shader high float precision rangeMin': 28,
+        'webgl red bits': 29,
+        vendorAndRenderer: 30,
+        'webgl vertex shader medium int precision rangeMin': 31,
+        'webgl vertex shader low float precision': 32,
+        'webgl vertex shader medium int precision': 33,
+        'webgl fragment shader medium float precision rangeMax': 34,
+        'webgl max texture image units': 35,
+        'webgl vertex shader medium float precision rangeMin': 36,
+        'webgl fragment shader high float precision rangeMin': 37,
+        'webgl fragment shader high int precision rangeMax': 38,
+        'webgl vertex shader high int precision rangeMax': 39,
+        webglHash: 40,
+        'webgl max varying vectors': 41,
+        'webgl fragment shader medium float precision rangeMin': 42,
+        'webgl vertex shader low int precision': 43,
+        'webgl fragment shader low float precision rangeMin': 44,
+        'webgl aliased line width range': 45,
+        'webgl max combined texture image units': 46,
+        'webgl shading language version': 47,
+        'webgl vertex shader high int precision rangeMin': 48,
+        'webgl max anisotropy': 49,
+        'webgl max render buffer size': 50,
+        'webgl vendor': 51,
+        'webgl vertex shader low int precision rangeMin': 52,
+        'webgl max fragment uniform vectors': 53,
+        'webgl fragment shader high float precision rangeMax': 54,
+        'webgl version': 55,
+        'webgl fragment shader high float precision': 56,
+        'webgl max texture size': 57,
+        'webgl max cube map texture size': 58,
+        'webgl fragment shader medium float precision': 59,
+        'webgl vertex shader low float precision rangeMin': 60,
+        'webgl max vertex attribs': 61,
+        'webgl alpha bits': 62,
+        'webgl vertex shader low float precision rangeMax': 63,
+        'webgl fragment shader low float precision rangeMax': 64,
+        'webgl depth bits': 65,
+        extensions: 66
     };
     const S = {
-      ANGLE_instanced_arrays: 67, EXT_blend_minmax: 68, EXT_clip_control: 69, EXT_color_buffer_float: 70,
-      EXT_color_buffer_half_float: 71, EXT_conservative_depth: 72, EXT_depth_clamp: 73, EXT_disjoint_timer_query: 74,
-      EXT_disjoint_timer_query_webgl2: 75, EXT_float_blend: 76, EXT_frag_depth: 77, EXT_polygon_offset_clamp: 78,
-      EXT_render_snorm: 79, EXT_shader_texture_lod: 80, EXT_texture_compression_bptc: 81, EXT_texture_compression_rgtc: 82,
-      EXT_texture_filter_anisotropic: 83, EXT_texture_mirror_clamp_to_edge: 84, EXT_texture_norm16: 85, EXT_sRGB: 86,
-      KHR_parallel_shader_compile: 87, NV_shader_noperspective_interpolation: 88, OES_draw_buffers_indexed: 89,
-      OES_element_index_uint: 90, OES_fbo_render_mipmap: 91, OES_sample_variables: 92, OES_shader_multisample_interpolation: 93,
-      OVR_multiview2: 94, OES_standard_derivatives: 95, OES_texture_float: 96, OES_texture_float_linear: 97,
-      OES_texture_half_float: 98, OES_texture_half_float_linear: 99, OES_vertex_array_object: 100,
-      WEBGL_blend_func_extended: 101, WEBGL_clip_cull_distance: 102, WEBGL_color_buffer_float: 103,
-      WEBGL_compressed_texture_astc: 104, WEBGL_compressed_texture_etc: 105, WEBGL_compressed_texture_etc1: 106,
-      WEBGL_compressed_texture_pvrtc: 107, WEBGL_compressed_texture_s3tc: 108, WEBGL_compressed_texture_s3tc_srgb: 109,
-      WEBGL_debug_renderer_info: 110, WEBGL_debug_shaders: 111, WEBGL_depth_texture: 112, WEBGL_draw_buffers: 113,
-      WEBGL_lose_context: 114, WEBGL_multi_draw: 115, WEBGL_polygon_mode: 116, WEBGL_provoking_vertex: 117,
-      WEBGL_render_shared_exponent: 118, WEBGL_stencil_texturing: 119
+        ANGLE_instanced_arrays: 67,
+        EXT_blend_minmax: 68,
+        EXT_clip_control: 69,
+        EXT_color_buffer_float: 70,
+        EXT_color_buffer_half_float: 71,
+        EXT_conservative_depth: 72,
+        EXT_depth_clamp: 73,
+        EXT_disjoint_timer_query: 74,
+        EXT_disjoint_timer_query_webgl2: 75,
+        EXT_float_blend: 76,
+        EXT_frag_depth: 77,
+        EXT_polygon_offset_clamp: 78,
+        EXT_render_snorm: 79,
+        EXT_shader_texture_lod: 80,
+        EXT_texture_compression_bptc: 81,
+        EXT_texture_compression_rgtc: 82,
+        EXT_texture_filter_anisotropic: 83,
+        EXT_texture_mirror_clamp_to_edge: 84,
+        EXT_texture_norm16: 85,
+        EXT_sRGB: 86,
+        KHR_parallel_shader_compile: 87,
+        NV_shader_noperspective_interpolation: 88,
+        OES_draw_buffers_indexed: 89,
+        OES_element_index_uint: 90,
+        OES_fbo_render_mipmap: 91,
+        OES_sample_variables: 92,
+        OES_shader_multisample_interpolation: 93,
+        OVR_multiview2: 94,
+        OES_standard_derivatives: 95,
+        OES_texture_float: 96,
+        OES_texture_float_linear: 97,
+        OES_texture_half_float: 98,
+        OES_texture_half_float_linear: 99,
+        OES_vertex_array_object: 100,
+        WEBGL_blend_func_extended: 101,
+        WEBGL_clip_cull_distance: 102,
+        WEBGL_color_buffer_float: 103,
+        WEBGL_compressed_texture_astc: 104,
+        WEBGL_compressed_texture_etc: 105,
+        WEBGL_compressed_texture_etc1: 106,
+        WEBGL_compressed_texture_pvrtc: 107,
+        WEBGL_compressed_texture_s3tc: 108,
+        WEBGL_compressed_texture_s3tc_srgb: 109,
+        WEBGL_debug_renderer_info: 110,
+        WEBGL_debug_shaders: 111,
+        WEBGL_depth_texture: 112,
+        WEBGL_draw_buffers: 113,
+        WEBGL_lose_context: 114,
+        WEBGL_multi_draw: 115,
+        WEBGL_polygon_mode: 116,
+        WEBGL_provoking_vertex: 117,
+        WEBGL_render_shared_exponent: 118,
+        WEBGL_stencil_texturing: 119
     };
     const I = {
-      'American Typewriter': 1, 'Andale Mono': 2, Arial: 3, 'Arial Black': 4, 'Arial Hebrew': 5, 'Arial Narrow': 6,
-      'Arial Rounded MT Bold': 7, 'Arial Unicode MS': 8, Avenir: 9, 'Avenir Next': 10, 'Avenir Next Condensed': 11,
-      Bahnschrift: 12, Baskerville: 13, 'Big Caslon': 14, 'Bodoni 72': 15, 'Bodoni 72 Oldstyle': 16,
-      'Bodoni 72 Smallcaps': 17, 'Bradley Hand': 18, 'Brush Script MT': 19, Calibri: 20, Cambria: 21,
-      'Cambria Math': 22, Candara: 23, Chalkboard: 24, 'Chalkboard SE': 25, Chalkduster: 26, Charter: 27,
-      Cochin: 28, 'Comic Sans MS': 29, Consolas: 30, Constantia: 31, Corbel: 32, Copperplate: 33, Courier: 34,
-      'Courier New': 35, Didot: 36, 'DIN Alternate': 37, 'DIN Condensed': 38, Ebrima: 39,
-      'Franklin Gothic Medium': 40, Futura: 41, Gabriola: 42, Gadugi: 43, Geneva: 44, Georgia: 45,
-      'Gill Sans': 46, Helvetica: 47, 'Helvetica Neue': 48, Herculanum: 49, 'Hoefler Text': 50,
-      'HoloLens MDL2 Assets': 51, Impact: 52, 'Ink Free': 53, 'Javanese Text': 54, 'Leelawadee UI': 55,
-      'Lucida Console': 56, 'LUCIDA GRANDE': 57, 'Lucida Grande': 58, 'Lucida Sans Unicode': 59, Luminari: 60,
-      'Malgun Gothic': 61, 'Marker Felt': 62, Marlett: 63, Menlo: 64, 'Microsoft Himalaya': 65,
-      'Microsoft JhengHei': 66, 'Microsoft New Tai Lue': 67, 'Microsoft PhagsPa': 68, 'Microsoft Sans Serif': 69,
-      'Microsoft Tai Le': 70, 'Microsoft YaHei': 71, 'Microsoft Yi Baiti': 72, 'MingLiU-ExtB': 73, Monaco: 74,
-      'Mongolian Baiti': 75, 'MS Gothic': 76, 'MV Boli': 77, 'Myanmar Text': 78, 'Nirmala UI': 79, Noteworthy: 80,
-      Optima: 81, Palatino: 82, 'Palatino Linotype': 83, Papyrus: 84, Phosphate: 85, Rockwell: 86,
-      'Savoye LET': 87, 'Segoe MDL2 Assets': 88, 'Segoe Print': 89, 'Segoe Script': 90, 'Segoe UI': 91,
-      'Segoe UI Historic': 92, 'Segoe UI Emoji': 93, 'Segoe UI Symbol': 94, SignPainter: 95, SimSun: 96,
-      Sitka: 97, Skia: 98, 'Snell Roundhand': 99, Sylfaen: 100, Symbol: 101, Tahoma: 102, Times: 103,
-      'Times New Roman': 104, Trattatello: 105, 'Trebuchet MS': 106, Verdana: 107, Webdings: 108, Wingdings: 109,
-      'Wingdings 2': 110, 'Wingdings 3': 111, 'Yu Gothic': 112, Zapfino: 113
+        'American Typewriter': 1,
+        'Andale Mono': 2,
+        Arial: 3,
+        'Arial Black': 4,
+        'Arial Hebrew': 5,
+        'Arial Narrow': 6,
+        'Arial Rounded MT Bold': 7,
+        'Arial Unicode MS': 8,
+        Avenir: 9,
+        'Avenir Next': 10,
+        'Avenir Next Condensed': 11,
+        Bahnschrift: 12,
+        Baskerville: 13,
+        'Big Caslon': 14,
+        'Bodoni 72': 15,
+        'Bodoni 72 Oldstyle': 16,
+        'Bodoni 72 Smallcaps': 17,
+        'Bradley Hand': 18,
+        'Brush Script MT': 19,
+        Calibri: 20,
+        Cambria: 21,
+        'Cambria Math': 22,
+        Candara: 23,
+        Chalkboard: 24,
+        'Chalkboard SE': 25,
+        Chalkduster: 26,
+        Charter: 27,
+        Cochin: 28,
+        'Comic Sans MS': 29,
+        Consolas: 30,
+        Constantia: 31,
+        Corbel: 32,
+        Copperplate: 33,
+        Courier: 34,
+        'Courier New': 35,
+        Didot: 36,
+        'DIN Alternate': 37,
+        'DIN Condensed': 38,
+        Ebrima: 39,
+        'Franklin Gothic Medium': 40,
+        Futura: 41,
+        Gabriola: 42,
+        Gadugi: 43,
+        Geneva: 44,
+        Georgia: 45,
+        'Gill Sans': 46,
+        Helvetica: 47,
+        'Helvetica Neue': 48,
+        Herculanum: 49,
+        'Hoefler Text': 50,
+        'HoloLens MDL2 Assets': 51,
+        Impact: 52,
+        'Ink Free': 53,
+        'Javanese Text': 54,
+        'Leelawadee UI': 55,
+        'Lucida Console': 56,
+        'LUCIDA GRANDE': 57,
+        'Lucida Grande': 58,
+        'Lucida Sans Unicode': 59,
+        Luminari: 60,
+        'Malgun Gothic': 61,
+        'Marker Felt': 62,
+        Marlett: 63,
+        Menlo: 64,
+        'Microsoft Himalaya': 65,
+        'Microsoft JhengHei': 66,
+        'Microsoft New Tai Lue': 67,
+        'Microsoft PhagsPa': 68,
+        'Microsoft Sans Serif': 69,
+        'Microsoft Tai Le': 70,
+        'Microsoft YaHei': 71,
+        'Microsoft Yi Baiti': 72,
+        'MingLiU-ExtB': 73,
+        Monaco: 74,
+        'Mongolian Baiti': 75,
+        'MS Gothic': 76,
+        'MV Boli': 77,
+        'Myanmar Text': 78,
+        'Nirmala UI': 79,
+        Noteworthy: 80,
+        Optima: 81,
+        Palatino: 82,
+        'Palatino Linotype': 83,
+        Papyrus: 84,
+        Phosphate: 85,
+        Rockwell: 86,
+        'Savoye LET': 87,
+        'Segoe MDL2 Assets': 88,
+        'Segoe Print': 89,
+        'Segoe Script': 90,
+        'Segoe UI': 91,
+        'Segoe UI Historic': 92,
+        'Segoe UI Emoji': 93,
+        'Segoe UI Symbol': 94,
+        SignPainter: 95,
+        SimSun: 96,
+        Sitka: 97,
+        Skia: 98,
+        'Snell Roundhand': 99,
+        Sylfaen: 100,
+        Symbol: 101,
+        Tahoma: 102,
+        Times: 103,
+        'Times New Roman': 104,
+        Trattatello: 105,
+        'Trebuchet MS': 106,
+        Verdana: 107,
+        Webdings: 108,
+        Wingdings: 109,
+        'Wingdings 2': 110,
+        'Wingdings 3': 111,
+        'Yu Gothic': 112,
+        Zapfino: 113
     };
     const A = {
-      appVersion: 1, numOfCores: 2, webrtc: 3, touchSupport: 4, webgl: 5, timezone: 6, plugins: 7, localStorage: 8,
-      incognito: 9, language: 10, appCodeName: 11, battery: 12, platform: 13, javascripts: 14, automation: 15,
-      pixelDepth: 16, screenOrientation: 17, availableScreenResolution: 18, timezoneOffset: 19, oscpu: 20, fonts: 21,
-      vendor: 22, sessionStorage: 23, webdriver: 24, audio: 25, openDatabase: 26, screenResolution: 27, vendorSub: 28,
-      enumerateDevices: 29, product: 30, canvas: 31, appName: 32, mimetyps: 33, cpuClass: 34, indexedDb: 35,
-      userAgent: 36, deviceMemory: 37, productSub: 38, addBehavior: 39, signals: 40, networkInfo: 41, location: 42,
-      colorDepth: 43, FPDataCookie: 44, tsSeed: 45, errors: 46, pixelRatio: 47
+        appVersion: 1,
+        numOfCores: 2,
+        webrtc: 3,
+        touchSupport: 4,
+        webgl: 5,
+        timezone: 6,
+        plugins: 7,
+        localStorage: 8,
+        incognito: 9,
+        language: 10,
+        appCodeName: 11,
+        battery: 12,
+        platform: 13,
+        javascripts: 14,
+        automation: 15,
+        pixelDepth: 16,
+        screenOrientation: 17,
+        availableScreenResolution: 18,
+        timezoneOffset: 19,
+        oscpu: 20,
+        fonts: 21,
+        vendor: 22,
+        sessionStorage: 23,
+        webdriver: 24,
+        audio: 25,
+        openDatabase: 26,
+        screenResolution: 27,
+        vendorSub: 28,
+        enumerateDevices: 29,
+        product: 30,
+        canvas: 31,
+        appName: 32,
+        mimetyps: 33,
+        cpuClass: 34,
+        indexedDb: 35,
+        userAgent: 36,
+        deviceMemory: 37,
+        productSub: 38,
+        addBehavior: 39,
+        signals: 40,
+        networkInfo: 41,
+        location: 42,
+        colorDepth: 43,
+        FPDataCookie: 44,
+        tsSeed: 45,
+        errors: 46,
+        pixelRatio: 47
     };
 
     const nestedMapByKey = {
-      location: f, networkInfo: p, signals: g, mimetyps: v, canvas: m, enumerateDevices: y, fonts: E,
-      screenOrientation: b, battery: w, touchSupport: T, webgl: _, FPDataCookie: h
+        location: f,
+        networkInfo: p,
+        signals: g,
+        mimetyps: v,
+        canvas: m,
+        enumerateDevices: y,
+        fonts: E,
+        screenOrientation: b,
+        battery: w,
+        touchSupport: T,
+        webgl: _,
+        FPDataCookie: h
     };
 
     const rawFontList = Object.keys(I);
     const collectorState = new Map();
     let activeRunId = 0;
     const FALLBACK_PUBLIC_KEYS = {
-      prod: {
-        key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqyVTa3Pi5twlDxHc34nl3MlTHOweIenIid6hDqVlh5/wcHzIxvB9nZjObW3HWfwqejGM+n2ZGbo9x8R7ByS3/V4qRgAs1z4aB6F5+HcXsx8uVrQfwigK0+u7d3g1s7H8qUaguMPHxNnyj5EisTJBh2jf9ODp8TpWnhAQHCCSZcDM4JIoIlsVdGmv+dGlzZzmf1if26U4KJqFdrqS83r3nGWcEpXWiQB+mx/EX4brbrhOFCvfPovvsLEjMTm0UC68Bvki3UsB/vkkMPW9cxNiiJJdnDkOEEdQPuFmPug+sqhACl3IIHLVBFM7vO0ca14rcCNSbSDaaKOY6BQoW1A30wIDAQAB',
-        version: 2
-      },
-      nonProd: {
-        key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtw/ArJ9dD6hi+jrX6ZpRqwk2Mm5v3EElQGhzSngYHAm7gvdcAEj6sbU4HhrXs3+TZamDV+RHwL+rDT+TtD8ZJBaVbA+wRDdIezECZT+WNZw2SMkjAsX0OynAT/wowGfE72zMhYc4byGfQmtAQrUL2iJ19KIJj0aZ4m41kvnBHMZbwO52+ceyQhqAzB7bn6U//QHJySHgjaOsgkpPnuxZUz6ly+FrKveQp+bNIfh8R5GO2ABRoeBL4c3jip/UjmmnfYE3xdzubni1a6WQ6YTTb6ZEJSgQTp/Rc+o/btcKkTIqDcXvGbO0iAxev8EXV7GtkRguqgfwaURAaps9Nes5NwIDAQAB',
-        version: 1
-      }
+        prod: {
+            key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqyVTa3Pi5twlDxHc34nl3MlTHOweIenIid6hDqVlh5/wcHzIxvB9nZjObW3HWfwqejGM+n2ZGbo9x8R7ByS3/V4qRgAs1z4aB6F5+HcXsx8uVrQfwigK0+u7d3g1s7H8qUaguMPHxNnyj5EisTJBh2jf9ODp8TpWnhAQHCCSZcDM4JIoIlsVdGmv+dGlzZzmf1if26U4KJqFdrqS83r3nGWcEpXWiQB+mx/EX4brbrhOFCvfPovvsLEjMTm0UC68Bvki3UsB/vkkMPW9cxNiiJJdnDkOEEdQPuFmPug+sqhACl3IIHLVBFM7vO0ca14rcCNSbSDaaKOY6BQoW1A30wIDAQAB',
+            version: 2
+        },
+        nonProd: {
+            key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtw/ArJ9dD6hi+jrX6ZpRqwk2Mm5v3EElQGhzSngYHAm7gvdcAEj6sbU4HhrXs3+TZamDV+RHwL+rDT+TtD8ZJBaVbA+wRDdIezECZT+WNZw2SMkjAsX0OynAT/wowGfE72zMhYc4byGfQmtAQrUL2iJ19KIJj0aZ4m41kvnBHMZbwO52+ceyQhqAzB7bn6U//QHJySHgjaOsgkpPnuxZUz6ly+FrKveQp+bNIfh8R5GO2ABRoeBL4c3jip/UjmmnfYE3xdzubni1a6WQ6YTTb6ZEJSgQTp/Rc+o/btcKkTIqDcXvGbO0iAxev8EXV7GtkRguqgfwaURAaps9Nes5NwIDAQAB',
+            version: 1
+        }
     };
 
     function copyTarget(targetId) {
-      const el = document.getElementById(targetId);
-      const text = el ? el.textContent : '';
-      if (!navigator.clipboard || !text) return;
-      navigator.clipboard.writeText(text).catch(() => {});
+        const el = document.getElementById(targetId);
+        const text = el ? el.textContent : '';
+        if (!navigator.clipboard || !text)
+            return;
+        navigator.clipboard.writeText(text).catch( () => {}
+        );
     }
 
     function x64Add(e, t) {
-      e = [e[0] >>> 16, e[0] & 65535, e[1] >>> 16, e[1] & 65535];
-      t = [t[0] >>> 16, t[0] & 65535, t[1] >>> 16, t[1] & 65535];
-      const n = [0, 0, 0, 0];
-      n[3] += e[3] + t[3]; n[2] += n[3] >>> 16; n[3] &= 65535;
-      n[2] += e[2] + t[2]; n[1] += n[2] >>> 16; n[2] &= 65535;
-      n[1] += e[1] + t[1]; n[0] += n[1] >>> 16; n[1] &= 65535;
-      n[0] += e[0] + t[0]; n[0] &= 65535;
-      return [(n[0] << 16) | n[1], (n[2] << 16) | n[3]];
+        e = [e[0] >>> 16, e[0] & 65535, e[1] >>> 16, e[1] & 65535];
+        t = [t[0] >>> 16, t[0] & 65535, t[1] >>> 16, t[1] & 65535];
+        const n = [0, 0, 0, 0];
+        n[3] += e[3] + t[3];
+        n[2] += n[3] >>> 16;
+        n[3] &= 65535;
+        n[2] += e[2] + t[2];
+        n[1] += n[2] >>> 16;
+        n[2] &= 65535;
+        n[1] += e[1] + t[1];
+        n[0] += n[1] >>> 16;
+        n[1] &= 65535;
+        n[0] += e[0] + t[0];
+        n[0] &= 65535;
+        return [(n[0] << 16) | n[1], (n[2] << 16) | n[3]];
     }
     function x64Multiply(e, t) {
-      e = [e[0] >>> 16, e[0] & 65535, e[1] >>> 16, e[1] & 65535];
-      t = [t[0] >>> 16, t[0] & 65535, t[1] >>> 16, t[1] & 65535];
-      const n = [0, 0, 0, 0];
-      n[3] += e[3] * t[3]; n[2] += n[3] >>> 16; n[3] &= 65535;
-      n[2] += e[2] * t[3]; n[1] += n[2] >>> 16; n[2] &= 65535;
-      n[2] += e[3] * t[2]; n[1] += n[2] >>> 16; n[2] &= 65535;
-      n[1] += e[1] * t[3]; n[0] += n[1] >>> 16; n[1] &= 65535;
-      n[1] += e[2] * t[2]; n[0] += n[1] >>> 16; n[1] &= 65535;
-      n[1] += e[3] * t[1]; n[0] += n[1] >>> 16; n[1] &= 65535;
-      n[0] += e[0] * t[3] + e[1] * t[2] + e[2] * t[1] + e[3] * t[0]; n[0] &= 65535;
-      return [(n[0] << 16) | n[1], (n[2] << 16) | n[3]];
+        e = [e[0] >>> 16, e[0] & 65535, e[1] >>> 16, e[1] & 65535];
+        t = [t[0] >>> 16, t[0] & 65535, t[1] >>> 16, t[1] & 65535];
+        const n = [0, 0, 0, 0];
+        n[3] += e[3] * t[3];
+        n[2] += n[3] >>> 16;
+        n[3] &= 65535;
+        n[2] += e[2] * t[3];
+        n[1] += n[2] >>> 16;
+        n[2] &= 65535;
+        n[2] += e[3] * t[2];
+        n[1] += n[2] >>> 16;
+        n[2] &= 65535;
+        n[1] += e[1] * t[3];
+        n[0] += n[1] >>> 16;
+        n[1] &= 65535;
+        n[1] += e[2] * t[2];
+        n[0] += n[1] >>> 16;
+        n[1] &= 65535;
+        n[1] += e[3] * t[1];
+        n[0] += n[1] >>> 16;
+        n[1] &= 65535;
+        n[0] += e[0] * t[3] + e[1] * t[2] + e[2] * t[1] + e[3] * t[0];
+        n[0] &= 65535;
+        return [(n[0] << 16) | n[1], (n[2] << 16) | n[3]];
     }
     function x64Rotl(e, t) {
-      t %= 64;
-      return t === 32 ? [e[1], e[0]] : t < 32 ? [(e[0] << t) | (e[1] >>> (32 - t)), (e[1] << t) | (e[0] >>> (32 - t))] : ((t -= 32), [(e[1] << t) | (e[0] >>> (32 - t)), (e[0] << t) | (e[1] >>> (32 - t))]);
+        t %= 64;
+        return t === 32 ? [e[1], e[0]] : t < 32 ? [(e[0] << t) | (e[1] >>> (32 - t)), (e[1] << t) | (e[0] >>> (32 - t))] : ((t -= 32),
+        [(e[1] << t) | (e[0] >>> (32 - t)), (e[0] << t) | (e[1] >>> (32 - t))]);
     }
     function x64LeftShift(e, t) {
-      t %= 64;
-      return t === 0 ? e : t < 32 ? [(e[0] << t) | (e[1] >>> (32 - t)), e[1] << t] : [e[1] << (t - 32), 0];
+        t %= 64;
+        return t === 0 ? e : t < 32 ? [(e[0] << t) | (e[1] >>> (32 - t)), e[1] << t] : [e[1] << (t - 32), 0];
     }
-    function x64Xor(e, t) { return [e[0] ^ t[0], e[1] ^ t[1]]; }
+    function x64Xor(e, t) {
+        return [e[0] ^ t[0], e[1] ^ t[1]];
+    }
     function x64Fmix(t) {
-      t = x64Xor(t, [0, t[0] >>> 1]);
-      t = x64Multiply(t, [4283543511, 3981806797]);
-      t = x64Xor(t, [0, t[0] >>> 1]);
-      t = x64Multiply(t, [3301882366, 444984403]);
-      return x64Xor(t, [0, t[0] >>> 1]);
+        t = x64Xor(t, [0, t[0] >>> 1]);
+        t = x64Multiply(t, [4283543511, 3981806797]);
+        t = x64Xor(t, [0, t[0] >>> 1]);
+        t = x64Multiply(t, [3301882366, 444984403]);
+        return x64Xor(t, [0, t[0] >>> 1]);
     }
     function x64hash128(input, seed) {
-      seed = seed || 0;
-      input = input || '';
-      let remainder = input.length % 16;
-      let bytes = input.length - remainder;
-      let h1 = [0, seed];
-      let h2 = [0, seed];
-      let k1 = [0, 0];
-      let k2 = [0, 0];
-      const c1 = [2277735313, 289559509];
-      const c2 = [1291169091, 658871167];
-      let i;
-      for (i = 0; i < bytes; i += 16) {
-        k1 = [(input.charCodeAt(i + 4) & 255) | ((input.charCodeAt(i + 5) & 255) << 8) | ((input.charCodeAt(i + 6) & 255) << 16) | ((input.charCodeAt(i + 7) & 255) << 24),
-              (input.charCodeAt(i) & 255) | ((input.charCodeAt(i + 1) & 255) << 8) | ((input.charCodeAt(i + 2) & 255) << 16) | ((input.charCodeAt(i + 3) & 255) << 24)];
-        k2 = [(input.charCodeAt(i + 12) & 255) | ((input.charCodeAt(i + 13) & 255) << 8) | ((input.charCodeAt(i + 14) & 255) << 16) | ((input.charCodeAt(i + 15) & 255) << 24),
-              (input.charCodeAt(i + 8) & 255) | ((input.charCodeAt(i + 9) & 255) << 8) | ((input.charCodeAt(i + 10) & 255) << 16) | ((input.charCodeAt(i + 11) & 255) << 24)];
-        k1 = x64Multiply(k1, c1); k1 = x64Rotl(k1, 31); k1 = x64Multiply(k1, c2); h1 = x64Xor(h1, k1); h1 = x64Rotl(h1, 27); h1 = x64Add(h1, h2); h1 = x64Add(x64Multiply(h1, [0, 5]), [0, 1390208809]);
-        k2 = x64Multiply(k2, c2); k2 = x64Rotl(k2, 33); k2 = x64Multiply(k2, c1); h2 = x64Xor(h2, k2); h2 = x64Rotl(h2, 31); h2 = x64Add(h2, h1); h2 = x64Add(x64Multiply(h2, [0, 5]), [0, 944331445]);
-      }
-      k1 = [0, 0]; k2 = [0, 0];
-      switch (remainder) {
-        case 15: k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 14)], 48));
-        case 14: k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 13)], 40));
-        case 13: k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 12)], 32));
-        case 12: k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 11)], 24));
-        case 11: k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 10)], 16));
-        case 10: k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 9)], 8));
-        case 9: k2 = x64Xor(k2, [0, input.charCodeAt(i + 8)]); k2 = x64Multiply(k2, c2); k2 = x64Rotl(k2, 33); k2 = x64Multiply(k2, c1); h2 = x64Xor(h2, k2);
-        case 8: k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 7)], 56));
-        case 7: k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 6)], 48));
-        case 6: k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 5)], 40));
-        case 5: k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 4)], 32));
-        case 4: k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 3)], 24));
-        case 3: k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 2)], 16));
-        case 2: k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 1)], 8));
-        case 1: k1 = x64Xor(k1, [0, input.charCodeAt(i)]); k1 = x64Multiply(k1, c1); k1 = x64Rotl(k1, 31); k1 = x64Multiply(k1, c2); h1 = x64Xor(h1, k1);
-      }
-      h1 = x64Xor(h1, [0, input.length]);
-      h2 = x64Xor(h2, [0, input.length]);
-      h1 = x64Add(h1, h2); h2 = x64Add(h2, h1); h1 = x64Fmix(h1); h2 = x64Fmix(h2); h1 = x64Add(h1, h2); h2 = x64Add(h2, h1);
-      return ('00000000' + (h1[0] >>> 0).toString(16)).slice(-8) + ('00000000' + (h1[1] >>> 0).toString(16)).slice(-8) + ('00000000' + (h2[0] >>> 0).toString(16)).slice(-8) + ('00000000' + (h2[1] >>> 0).toString(16)).slice(-8);
+        seed = seed || 0;
+        input = input || '';
+        let remainder = input.length % 16;
+        let bytes = input.length - remainder;
+        let h1 = [0, seed];
+        let h2 = [0, seed];
+        let k1 = [0, 0];
+        let k2 = [0, 0];
+        const c1 = [2277735313, 289559509];
+        const c2 = [1291169091, 658871167];
+        let i;
+        for (i = 0; i < bytes; i += 16) {
+            k1 = [(input.charCodeAt(i + 4) & 255) | ((input.charCodeAt(i + 5) & 255) << 8) | ((input.charCodeAt(i + 6) & 255) << 16) | ((input.charCodeAt(i + 7) & 255) << 24), (input.charCodeAt(i) & 255) | ((input.charCodeAt(i + 1) & 255) << 8) | ((input.charCodeAt(i + 2) & 255) << 16) | ((input.charCodeAt(i + 3) & 255) << 24)];
+            k2 = [(input.charCodeAt(i + 12) & 255) | ((input.charCodeAt(i + 13) & 255) << 8) | ((input.charCodeAt(i + 14) & 255) << 16) | ((input.charCodeAt(i + 15) & 255) << 24), (input.charCodeAt(i + 8) & 255) | ((input.charCodeAt(i + 9) & 255) << 8) | ((input.charCodeAt(i + 10) & 255) << 16) | ((input.charCodeAt(i + 11) & 255) << 24)];
+            k1 = x64Multiply(k1, c1);
+            k1 = x64Rotl(k1, 31);
+            k1 = x64Multiply(k1, c2);
+            h1 = x64Xor(h1, k1);
+            h1 = x64Rotl(h1, 27);
+            h1 = x64Add(h1, h2);
+            h1 = x64Add(x64Multiply(h1, [0, 5]), [0, 1390208809]);
+            k2 = x64Multiply(k2, c2);
+            k2 = x64Rotl(k2, 33);
+            k2 = x64Multiply(k2, c1);
+            h2 = x64Xor(h2, k2);
+            h2 = x64Rotl(h2, 31);
+            h2 = x64Add(h2, h1);
+            h2 = x64Add(x64Multiply(h2, [0, 5]), [0, 944331445]);
+        }
+        k1 = [0, 0];
+        k2 = [0, 0];
+        switch (remainder) {
+        case 15:
+            k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 14)], 48));
+        case 14:
+            k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 13)], 40));
+        case 13:
+            k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 12)], 32));
+        case 12:
+            k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 11)], 24));
+        case 11:
+            k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 10)], 16));
+        case 10:
+            k2 = x64Xor(k2, x64LeftShift([0, input.charCodeAt(i + 9)], 8));
+        case 9:
+            k2 = x64Xor(k2, [0, input.charCodeAt(i + 8)]);
+            k2 = x64Multiply(k2, c2);
+            k2 = x64Rotl(k2, 33);
+            k2 = x64Multiply(k2, c1);
+            h2 = x64Xor(h2, k2);
+        case 8:
+            k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 7)], 56));
+        case 7:
+            k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 6)], 48));
+        case 6:
+            k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 5)], 40));
+        case 5:
+            k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 4)], 32));
+        case 4:
+            k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 3)], 24));
+        case 3:
+            k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 2)], 16));
+        case 2:
+            k1 = x64Xor(k1, x64LeftShift([0, input.charCodeAt(i + 1)], 8));
+        case 1:
+            k1 = x64Xor(k1, [0, input.charCodeAt(i)]);
+            k1 = x64Multiply(k1, c1);
+            k1 = x64Rotl(k1, 31);
+            k1 = x64Multiply(k1, c2);
+            h1 = x64Xor(h1, k1);
+        }
+        h1 = x64Xor(h1, [0, input.length]);
+        h2 = x64Xor(h2, [0, input.length]);
+        h1 = x64Add(h1, h2);
+        h2 = x64Add(h2, h1);
+        h1 = x64Fmix(h1);
+        h2 = x64Fmix(h2);
+        h1 = x64Add(h1, h2);
+        h2 = x64Add(h2, h1);
+        return ('00000000' + (h1[0] >>> 0).toString(16)).slice(-8) + ('00000000' + (h1[1] >>> 0).toString(16)).slice(-8) + ('00000000' + (h2[0] >>> 0).toString(16)).slice(-8) + ('00000000' + (h2[1] >>> 0).toString(16)).slice(-8);
     }
 
     const LZ = {
-      compressToBase64(input) {
-        if (input == null) return '';
-        const out = this._compress(input, 6, (a) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='.charAt(a));
-        switch (out.length % 4) { case 0: return out; case 1: return out + '==='; case 2: return out + '=='; case 3: return out + '='; default: return out; }
-      },
-      _compress(uncompressed, bitsPerChar, getCharFromInt) {
-        if (uncompressed == null) return '';
-        let i, value;
-        const context_dictionary = {};
-        const context_dictionaryToCreate = {};
-        let context_c = '';
-        let context_wc = '';
-        let context_w = '';
-        let context_enlargeIn = 2;
-        let context_dictSize = 3;
-        let context_numBits = 2;
-        const context_data = [];
-        let context_data_val = 0;
-        let context_data_position = 0;
-        for (let ii = 0; ii < uncompressed.length; ii += 1) {
-          context_c = uncompressed.charAt(ii);
-          if (!Object.prototype.hasOwnProperty.call(context_dictionary, context_c)) { context_dictionary[context_c] = context_dictSize++; context_dictionaryToCreate[context_c] = true; }
-          context_wc = context_w + context_c;
-          if (Object.prototype.hasOwnProperty.call(context_dictionary, context_wc)) {
-            context_w = context_wc;
-          } else {
-            if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
-              if (context_w.charCodeAt(0) < 256) {
-                for (i = 0; i < context_numBits; i++) { context_data_val <<= 1; if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } }
-                value = context_w.charCodeAt(0);
-                for (i = 0; i < 8; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value >>= 1; }
-              } else {
-                value = 1;
-                for (i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | value; if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value = 0; }
-                value = context_w.charCodeAt(0);
-                for (i = 0; i < 16; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value >>= 1; }
-              }
-              context_enlargeIn--; if (context_enlargeIn === 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
-              delete context_dictionaryToCreate[context_w];
-            } else {
-              value = context_dictionary[context_w];
-              for (i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value >>= 1; }
+        compressToBase64(input) {
+            if (input == null)
+                return '';
+            const out = this._compress(input, 6, (a) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='.charAt(a));
+            switch (out.length % 4) {
+            case 0:
+                return out;
+            case 1:
+                return out + '===';
+            case 2:
+                return out + '==';
+            case 3:
+                return out + '=';
+            default:
+                return out;
             }
-            context_enlargeIn--; if (context_enlargeIn === 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
-            context_dictionary[context_wc] = context_dictSize++;
-            context_w = String(context_c);
-          }
-        }
-        if (context_w !== '') {
-          if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
-            if (context_w.charCodeAt(0) < 256) {
-              for (i = 0; i < context_numBits; i++) { context_data_val <<= 1; if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } }
-              value = context_w.charCodeAt(0);
-              for (i = 0; i < 8; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value >>= 1; }
-            } else {
-              value = 1;
-              for (i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | value; if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value = 0; }
-              value = context_w.charCodeAt(0);
-              for (i = 0; i < 16; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value >>= 1; }
+        },
+        _compress(uncompressed, bitsPerChar, getCharFromInt) {
+            if (uncompressed == null)
+                return '';
+            let i, value;
+            const context_dictionary = {};
+            const context_dictionaryToCreate = {};
+            let context_c = '';
+            let context_wc = '';
+            let context_w = '';
+            let context_enlargeIn = 2;
+            let context_dictSize = 3;
+            let context_numBits = 2;
+            const context_data = [];
+            let context_data_val = 0;
+            let context_data_position = 0;
+            for (let ii = 0; ii < uncompressed.length; ii += 1) {
+                context_c = uncompressed.charAt(ii);
+                if (!Object.prototype.hasOwnProperty.call(context_dictionary, context_c)) {
+                    context_dictionary[context_c] = context_dictSize++;
+                    context_dictionaryToCreate[context_c] = true;
+                }
+                context_wc = context_w + context_c;
+                if (Object.prototype.hasOwnProperty.call(context_dictionary, context_wc)) {
+                    context_w = context_wc;
+                } else {
+                    if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
+                        if (context_w.charCodeAt(0) < 256) {
+                            for (i = 0; i < context_numBits; i++) {
+                                context_data_val <<= 1;
+                                if (context_data_position === bitsPerChar - 1) {
+                                    context_data_position = 0;
+                                    context_data.push(getCharFromInt(context_data_val));
+                                    context_data_val = 0;
+                                } else {
+                                    context_data_position++;
+                                }
+                            }
+                            value = context_w.charCodeAt(0);
+                            for (i = 0; i < 8; i++) {
+                                context_data_val = (context_data_val << 1) | (value & 1);
+                                if (context_data_position === bitsPerChar - 1) {
+                                    context_data_position = 0;
+                                    context_data.push(getCharFromInt(context_data_val));
+                                    context_data_val = 0;
+                                } else {
+                                    context_data_position++;
+                                }
+                                value >>= 1;
+                            }
+                        } else {
+                            value = 1;
+                            for (i = 0; i < context_numBits; i++) {
+                                context_data_val = (context_data_val << 1) | value;
+                                if (context_data_position === bitsPerChar - 1) {
+                                    context_data_position = 0;
+                                    context_data.push(getCharFromInt(context_data_val));
+                                    context_data_val = 0;
+                                } else {
+                                    context_data_position++;
+                                }
+                                value = 0;
+                            }
+                            value = context_w.charCodeAt(0);
+                            for (i = 0; i < 16; i++) {
+                                context_data_val = (context_data_val << 1) | (value & 1);
+                                if (context_data_position === bitsPerChar - 1) {
+                                    context_data_position = 0;
+                                    context_data.push(getCharFromInt(context_data_val));
+                                    context_data_val = 0;
+                                } else {
+                                    context_data_position++;
+                                }
+                                value >>= 1;
+                            }
+                        }
+                        context_enlargeIn--;
+                        if (context_enlargeIn === 0) {
+                            context_enlargeIn = Math.pow(2, context_numBits);
+                            context_numBits++;
+                        }
+                        delete context_dictionaryToCreate[context_w];
+                    } else {
+                        value = context_dictionary[context_w];
+                        for (i = 0; i < context_numBits; i++) {
+                            context_data_val = (context_data_val << 1) | (value & 1);
+                            if (context_data_position === bitsPerChar - 1) {
+                                context_data_position = 0;
+                                context_data.push(getCharFromInt(context_data_val));
+                                context_data_val = 0;
+                            } else {
+                                context_data_position++;
+                            }
+                            value >>= 1;
+                        }
+                    }
+                    context_enlargeIn--;
+                    if (context_enlargeIn === 0) {
+                        context_enlargeIn = Math.pow(2, context_numBits);
+                        context_numBits++;
+                    }
+                    context_dictionary[context_wc] = context_dictSize++;
+                    context_w = String(context_c);
+                }
             }
-            context_enlargeIn--; if (context_enlargeIn === 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
-            delete context_dictionaryToCreate[context_w];
-          } else {
-            value = context_dictionary[context_w];
-            for (i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value >>= 1; }
-          }
-          context_enlargeIn--; if (context_enlargeIn === 0) { context_enlargeIn = Math.pow(2, context_numBits); context_numBits++; }
+            if (context_w !== '') {
+                if (Object.prototype.hasOwnProperty.call(context_dictionaryToCreate, context_w)) {
+                    if (context_w.charCodeAt(0) < 256) {
+                        for (i = 0; i < context_numBits; i++) {
+                            context_data_val <<= 1;
+                            if (context_data_position === bitsPerChar - 1) {
+                                context_data_position = 0;
+                                context_data.push(getCharFromInt(context_data_val));
+                                context_data_val = 0;
+                            } else {
+                                context_data_position++;
+                            }
+                        }
+                        value = context_w.charCodeAt(0);
+                        for (i = 0; i < 8; i++) {
+                            context_data_val = (context_data_val << 1) | (value & 1);
+                            if (context_data_position === bitsPerChar - 1) {
+                                context_data_position = 0;
+                                context_data.push(getCharFromInt(context_data_val));
+                                context_data_val = 0;
+                            } else {
+                                context_data_position++;
+                            }
+                            value >>= 1;
+                        }
+                    } else {
+                        value = 1;
+                        for (i = 0; i < context_numBits; i++) {
+                            context_data_val = (context_data_val << 1) | value;
+                            if (context_data_position === bitsPerChar - 1) {
+                                context_data_position = 0;
+                                context_data.push(getCharFromInt(context_data_val));
+                                context_data_val = 0;
+                            } else {
+                                context_data_position++;
+                            }
+                            value = 0;
+                        }
+                        value = context_w.charCodeAt(0);
+                        for (i = 0; i < 16; i++) {
+                            context_data_val = (context_data_val << 1) | (value & 1);
+                            if (context_data_position === bitsPerChar - 1) {
+                                context_data_position = 0;
+                                context_data.push(getCharFromInt(context_data_val));
+                                context_data_val = 0;
+                            } else {
+                                context_data_position++;
+                            }
+                            value >>= 1;
+                        }
+                    }
+                    context_enlargeIn--;
+                    if (context_enlargeIn === 0) {
+                        context_enlargeIn = Math.pow(2, context_numBits);
+                        context_numBits++;
+                    }
+                    delete context_dictionaryToCreate[context_w];
+                } else {
+                    value = context_dictionary[context_w];
+                    for (i = 0; i < context_numBits; i++) {
+                        context_data_val = (context_data_val << 1) | (value & 1);
+                        if (context_data_position === bitsPerChar - 1) {
+                            context_data_position = 0;
+                            context_data.push(getCharFromInt(context_data_val));
+                            context_data_val = 0;
+                        } else {
+                            context_data_position++;
+                        }
+                        value >>= 1;
+                    }
+                }
+                context_enlargeIn--;
+                if (context_enlargeIn === 0) {
+                    context_enlargeIn = Math.pow(2, context_numBits);
+                    context_numBits++;
+                }
+            }
+            value = 2;
+            for (i = 0; i < context_numBits; i++) {
+                context_data_val = (context_data_val << 1) | (value & 1);
+                if (context_data_position === bitsPerChar - 1) {
+                    context_data_position = 0;
+                    context_data.push(getCharFromInt(context_data_val));
+                    context_data_val = 0;
+                } else {
+                    context_data_position++;
+                }
+                value >>= 1;
+            }
+            while (true) {
+                context_data_val <<= 1;
+                if (context_data_position === bitsPerChar - 1) {
+                    context_data.push(getCharFromInt(context_data_val));
+                    break;
+                } else {
+                    context_data_position++;
+                }
+            }
+            return context_data.join('');
         }
-        value = 2;
-        for (i = 0; i < context_numBits; i++) { context_data_val = (context_data_val << 1) | (value & 1); if (context_data_position === bitsPerChar - 1) { context_data_position = 0; context_data.push(getCharFromInt(context_data_val)); context_data_val = 0; } else { context_data_position++; } value >>= 1; }
-        while (true) { context_data_val <<= 1; if (context_data_position === bitsPerChar - 1) { context_data.push(getCharFromInt(context_data_val)); break; } else { context_data_position++; } }
-        return context_data.join('');
-      }
     };
 
-    function safeSerialize(value) { return JSON.stringify(value, null, 2); }
-    function textBytes(text) { return new TextEncoder().encode(text); }
-    function bytesToBase64(bytes) { return btoa(String.fromCharCode.apply(null, bytes)); }
-    function base64ToBytes(base64) { return Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0)); }
-    function str2ab(str) { const buf = new ArrayBuffer(str.length); const view = new Uint8Array(buf); for (let i = 0; i < str.length; i++) view[i] = str.charCodeAt(i); return buf; }
-    function cookieValue(name) {
-      const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
-      return match ? decodeURIComponent(match[1]) : '';
+    function safeSerialize(value) {
+        return JSON.stringify(value, null, 2);
     }
-    function sanitizeCookieValue(raw) { return typeof raw === 'string' ? raw.replace(/^"|"$/g, '') : raw; }
+    function textBytes(text) {
+        return new TextEncoder().encode(text);
+    }
+    function bytesToBase64(bytes) {
+        return btoa(String.fromCharCode.apply(null, bytes));
+    }
+    function base64ToBytes(base64) {
+        return Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0));
+    }
+    function str2ab(str) {
+        const buf = new ArrayBuffer(str.length);
+        const view = new Uint8Array(buf);
+        for (let i = 0; i < str.length; i++)
+            view[i] = str.charCodeAt(i);
+        return buf;
+    }
+    function cookieValue(name) {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+    function sanitizeCookieValue(raw) {
+        return typeof raw === 'string' ? raw.replace(/^"|"$/g, '') : raw;
+    }
 
     async function importPk(format, base64Key, usages) {
-      const binary = atob(base64Key);
-      return crypto.subtle.importKey(format, str2ab(binary), { name: 'RSA-OAEP', hash: 'SHA-256' }, true, usages);
+        const binary = atob(base64Key);
+        return crypto.subtle.importKey(format, str2ab(binary), {
+            name: 'RSA-OAEP',
+            hash: 'SHA-256'
+        }, true, usages);
     }
-    function wrapErrorResult(error) { return { a: null, b: null, c: null, error }; }
+    function wrapErrorResult(error) {
+        return {
+            a: null,
+            b: null,
+            c: null,
+            error
+        };
+    }
     async function wrap(aesKey, publicKeyBase64) {
-      const imported = await importPk('spki', publicKeyBase64, ['wrapKey']);
-      const wrapped = await crypto.subtle.wrapKey('raw', aesKey, imported, { name: 'RSA-OAEP' });
-      return bytesToBase64(new Uint8Array(wrapped));
+        const imported = await importPk('spki', publicKeyBase64, ['wrapKey']);
+        const wrapped = await crypto.subtle.wrapKey('raw', aesKey, imported, {
+            name: 'RSA-OAEP'
+        });
+        return bytesToBase64(new Uint8Array(wrapped));
     }
     async function encryptWithKey(plaintext, publicKeyBase64, keyVersion) {
-      const result = { a: null, b: null, c: null };
-      try {
-        const start = performance.now();
-        if (typeof publicKeyBase64 !== 'string' || typeof keyVersion !== 'number') throw new Error('ec1');
-        const iv = crypto.getRandomValues(new Uint8Array(16));
-        result.a = bytesToBase64(iv);
-        const encoded = textBytes(plaintext);
-        const aesKey = await crypto.subtle.generateKey({ name: 'AES-CBC', length: 256 }, true, ['encrypt', 'decrypt']);
-        const encrypted = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, aesKey, encoded);
-        result.b = await wrap(aesKey, publicKeyBase64);
-        result.c = bytesToBase64(new Uint8Array(encrypted));
-        result.d = Math.round(performance.now() - start);
-        result.e = keyVersion;
-        return result;
-      } catch (error) {
-        result.error = String(error);
-        return result;
-      }
+        const result = {
+            a: null,
+            b: null,
+            c: null
+        };
+        try {
+            const start = performance.now();
+            if (typeof publicKeyBase64 !== 'string' || typeof keyVersion !== 'number')
+                throw new Error('ec1');
+            const iv = crypto.getRandomValues(new Uint8Array(16));
+            result.a = bytesToBase64(iv);
+            const encoded = textBytes(plaintext);
+            const aesKey = await crypto.subtle.generateKey({
+                name: 'AES-CBC',
+                length: 256
+            }, true, ['encrypt', 'decrypt']);
+            const encrypted = await crypto.subtle.encrypt({
+                name: 'AES-CBC',
+                iv
+            }, aesKey, encoded);
+            result.b = await wrap(aesKey, publicKeyBase64);
+            result.c = bytesToBase64(new Uint8Array(encrypted));
+            result.d = Math.round(performance.now() - start);
+            result.e = keyVersion;
+            return result;
+        } catch (error) {
+            result.error = String(error);
+            return result;
+        }
     }
     async function encryptWithKeyIds(payload, pkCookieName, pkvCookieName, isProd) {
-      if (typeof pkCookieName !== 'string' || typeof pkvCookieName !== 'string') return wrapErrorResult('Error: ec2');
-      let publicKey = sanitizeCookieValue(cookieValue(pkCookieName));
-      let version = parseInt(sanitizeCookieValue(cookieValue(pkvCookieName)), 10);
-      if (publicKey === '' || typeof publicKey !== 'string' || typeof version !== 'number' || Number.isNaN(version)) {
-        const fallback = isProd ? FALLBACK_PUBLIC_KEYS.prod : FALLBACK_PUBLIC_KEYS.nonProd;
-        publicKey = fallback.key;
-        version = fallback.version;
-      }
-      return encryptWithKey(payload, publicKey, version);
+        if (typeof pkCookieName !== 'string' || typeof pkvCookieName !== 'string')
+            return wrapErrorResult('Error: ec2');
+        let publicKey = sanitizeCookieValue(cookieValue(pkCookieName));
+        let version = parseInt(sanitizeCookieValue(cookieValue(pkvCookieName)), 10);
+        if (publicKey === '' || typeof publicKey !== 'string' || typeof version !== 'number' || Number.isNaN(version)) {
+            const fallback = isProd ? FALLBACK_PUBLIC_KEYS.prod : FALLBACK_PUBLIC_KEYS.nonProd;
+            publicKey = fallback.key;
+            version = fallback.version;
+        }
+        return encryptWithKey(payload, publicKey, version);
     }
 
     function each(list, cb) {
-      if (Array.isArray(list)) { list.forEach(cb); return; }
-      Object.keys(list).forEach((key) => cb(list[key], key, list));
+        if (Array.isArray(list)) {
+            list.forEach(cb);
+            return;
+        }
+        Object.keys(list).forEach( (key) => cb(list[key], key, list));
     }
-    function map(list, cb) { return Array.isArray(list) ? list.map(cb) : Object.keys(list).map((key) => cb(list[key], key, list)); }
-    function toJsonLength(value) { try { return JSON.stringify(value).length; } catch { return 0; } }
-    function formatMs(ms) { return `${Math.round(ms)} ms`; }
-    function maybeApplyPreprocessor(value, preprocessor, key) { return typeof preprocessor === 'function' ? preprocessor(key, value) : value; }
+    function map(list, cb) {
+        return Array.isArray(list) ? list.map(cb) : Object.keys(list).map( (key) => cb(list[key], key, list));
+    }
+    function toJsonLength(value) {
+        try {
+            return JSON.stringify(value).length;
+        } catch {
+            return 0;
+        }
+    }
+    function formatMs(ms) {
+        return `${Math.round(ms)} ms`;
+    }
+    function maybeApplyPreprocessor(value, preprocessor, key) {
+        return typeof preprocessor === 'function' ? preprocessor(key, value) : value;
+    }
 
     function getBrowserNameAndVersion() {
-      let tem;
-      const ua = navigator.userAgent;
-      let match = ua.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i) || [];
-      if (/trident/i.test(match[1])) {
-        tem = /\brv[ :]+(\d+)/g.exec(ua) || [];
-        return 'IE ' + (tem[1] || '');
-      }
-      if (match[1] === 'Chrome' && (tem = ua.match(/\b(OPR|Edge)\/(\d+)/))) return tem.slice(1).join(' ').replace('OPR', 'Opera');
-      match = match[2] ? [match[1], match[2]] : [navigator.appName, navigator.appVersion, '-?'];
-      tem = ua.match(/version\/(\d+)/i);
-      if (tem) match.splice(1, 1, tem[1]);
-      return match.join(' ');
+        let tem;
+        const ua = navigator.userAgent;
+        let match = ua.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i) || [];
+        if (/trident/i.test(match[1])) {
+            tem = /\brv[ :]+(\d+)/g.exec(ua) || [];
+            return 'IE ' + (tem[1] || '');
+        }
+        if (match[1] === 'Chrome' && (tem = ua.match(/\b(OPR|Edge)\/(\d+)/)))
+            return tem.slice(1).join(' ').replace('OPR', 'Opera');
+        match = match[2] ? [match[1], match[2]] : [navigator.appName, navigator.appVersion, '-?'];
+        tem = ua.match(/version\/(\d+)/i);
+        if (tem)
+            match.splice(1, 1, tem[1]);
+        return match.join(' ');
     }
-    function getHasLiedLanguages() { try { return Array.isArray(navigator.languages) && navigator.languages[0].substr(0, 2) !== navigator.language.substr(0, 2); } catch { return true; } }
-    function getHasLiedResolution() { return screen.width < screen.availWidth || screen.height < screen.availHeight; }
+    function getHasLiedLanguages() {
+        try {
+            return Array.isArray(navigator.languages) && navigator.languages[0].substr(0, 2) !== navigator.language.substr(0, 2);
+        } catch {
+            return true;
+        }
+    }
+    function getHasLiedResolution() {
+        return screen.width < screen.availWidth || screen.height < screen.availHeight;
+    }
     function getHasLiedOs() {
-      const ua = navigator.userAgent.toLowerCase();
-      const oscpu = navigator.oscpu;
-      const platform = (navigator.platform || '').toLowerCase();
-      const os = ua.includes('windows phone') ? 'Windows Phone' : ua.includes('win') ? 'Windows' : ua.includes('android') ? 'Android' : (ua.includes('linux') || ua.includes('cros')) ? 'Linux' : (ua.includes('iphone') || ua.includes('ipad')) ? 'iOS' : ua.includes('mac') ? 'Mac' : 'Other';
-      if ((('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0) && !['Windows Phone', 'Android', 'iOS', 'Other'].includes(os)) return true;
-      if (oscpu) {
-        const value = oscpu.toLowerCase();
-        if (value.includes('win') && !['Windows', 'Windows Phone'].includes(os)) return true;
-        if (value.includes('linux') && !['Linux', 'Android'].includes(os)) return true;
-        if (value.includes('mac') && !['Mac', 'iOS'].includes(os)) return true;
-      }
-      return (platform.includes('win') && !['Windows', 'Windows Phone'].includes(os)) || ((platform.includes('linux') || platform.includes('android') || platform.includes('pike')) && !['Linux', 'Android'].includes(os)) || ((platform.includes('mac') || platform.includes('ipad') || platform.includes('ipod') || platform.includes('iphone')) && !['Mac', 'iOS'].includes(os));
+        const ua = navigator.userAgent.toLowerCase();
+        const oscpu = navigator.oscpu;
+        const platform = (navigator.platform || '').toLowerCase();
+        const os = ua.includes('windows phone') ? 'Windows Phone' : ua.includes('win') ? 'Windows' : ua.includes('android') ? 'Android' : (ua.includes('linux') || ua.includes('cros')) ? 'Linux' : (ua.includes('iphone') || ua.includes('ipad')) ? 'iOS' : ua.includes('mac') ? 'Mac' : 'Other';
+        if ((('ontouchstart'in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0) && !['Windows Phone', 'Android', 'iOS', 'Other'].includes(os))
+            return true;
+        if (oscpu) {
+            const value = oscpu.toLowerCase();
+            if (value.includes('win') && !['Windows', 'Windows Phone'].includes(os))
+                return true;
+            if (value.includes('linux') && !['Linux', 'Android'].includes(os))
+                return true;
+            if (value.includes('mac') && !['Mac', 'iOS'].includes(os))
+                return true;
+        }
+        return (platform.includes('win') && !['Windows', 'Windows Phone'].includes(os)) || ((platform.includes('linux') || platform.includes('android') || platform.includes('pike')) && !['Linux', 'Android'].includes(os)) || ((platform.includes('mac') || platform.includes('ipad') || platform.includes('ipod') || platform.includes('iphone')) && !['Mac', 'iOS'].includes(os));
     }
     function getHasLiedBrowser() {
-      const ua = navigator.userAgent.toLowerCase();
-      const productSub = navigator.productSub;
-      const browser = ua.includes('firefox') ? 'Firefox' : (ua.includes('opera') || ua.includes('opr')) ? 'Opera' : ua.includes('chrome') ? 'Chrome' : ua.includes('safari') ? 'Safari' : ua.includes('trident') ? 'Internet Explorer' : 'Other';
-      if ((browser === 'Chrome' || browser === 'Safari' || browser === 'Opera') && productSub !== '20030107') return true;
-      const evalLength = eval.toString().length;
-      if (evalLength === 37 && !['Safari', 'Firefox', 'Other'].includes(browser)) return true;
-      if (evalLength === 39 && !['Internet Explorer', 'Other'].includes(browser)) return true;
-      if (evalLength === 33 && !['Chrome', 'Opera', 'Other'].includes(browser)) return true;
-      try { throw 'a'; } catch (err) { try { err.toSource(); return browser !== 'Firefox' && browser !== 'Other'; } catch { return false; } }
+        const ua = navigator.userAgent.toLowerCase();
+        const productSub = navigator.productSub;
+        const browser = ua.includes('firefox') ? 'Firefox' : (ua.includes('opera') || ua.includes('opr')) ? 'Opera' : ua.includes('chrome') ? 'Chrome' : ua.includes('safari') ? 'Safari' : ua.includes('trident') ? 'Internet Explorer' : 'Other';
+        if ((browser === 'Chrome' || browser === 'Safari' || browser === 'Opera') && productSub !== '20030107')
+            return true;
+        const evalLength = eval.toString().length;
+        if (evalLength === 37 && !['Safari', 'Firefox', 'Other'].includes(browser))
+            return true;
+        if (evalLength === 39 && !['Internet Explorer', 'Other'].includes(browser))
+            return true;
+        if (evalLength === 33 && !['Chrome', 'Opera', 'Other'].includes(browser))
+            return true;
+        try {
+            throw 'a';
+        } catch (err) {
+            try {
+                err.toSource();
+                return browser !== 'Firefox' && browser !== 'Other';
+            } catch {
+                return false;
+            }
+        }
     }
     function getAdBlock() {
-      const el = document.createElement('div');
-      el.innerHTML = '&nbsp;';
-      el.className = 'adsbox';
-      let blocked = false;
-      try { document.body.appendChild(el); blocked = document.getElementsByClassName('adsbox')[0].offsetHeight === 0; document.body.removeChild(el); } catch { blocked = false; }
-      return blocked;
+        const el = document.createElement('div');
+        el.innerHTML = '&nbsp;';
+        el.className = 'adsbox';
+        let blocked = false;
+        try {
+            document.body.appendChild(el);
+            blocked = document.getElementsByClassName('adsbox')[0].offsetHeight === 0;
+            document.body.removeChild(el);
+        } catch {
+            blocked = false;
+        }
+        return blocked;
     }
     function getTouchSupport() {
-      let touchEvent = false;
-      let points = 0;
-      if (navigator.maxTouchPoints !== undefined) points = navigator.maxTouchPoints;
-      else if (navigator.msMaxTouchPoints !== undefined) points = navigator.msMaxTouchPoints;
-      try { document.createEvent('TouchEvent'); touchEvent = true; } catch { touchEvent = false; }
-      return { maxTouchPoints: points, touchEvent, touchStart: 'ontouchstart' in window };
+        let touchEvent = false;
+        let points = 0;
+        if (navigator.maxTouchPoints !== undefined)
+            points = navigator.maxTouchPoints;
+        else if (navigator.msMaxTouchPoints !== undefined)
+            points = navigator.msMaxTouchPoints;
+        try {
+            document.createEvent('TouchEvent');
+            touchEvent = true;
+        } catch {
+            touchEvent = false;
+        }
+        return {
+            maxTouchPoints: points,
+            touchEvent,
+            touchStart: 'ontouchstart'in window
+        };
     }
-    function hasSessionStorage(errorValue) { try { return !!window.sessionStorage; } catch { return errorValue.ERROR; } }
-    function hasLocalStorage(errorValue) { try { return !!window.localStorage; } catch { return errorValue.ERROR; } }
-    function hasIndexedDB(errorValue) { try { return !!window.indexedDB; } catch { return errorValue.ERROR; } }
-    function getWebglCanvas() { const canvas = document.createElement('canvas'); try { return canvas.getContext('webgl') || canvas.getContext('experimental-webgl'); } catch { return null; } }
-    function isCanvasSupported() { const canvas = document.createElement('canvas'); return !!(canvas.getContext && canvas.getContext('2d')); }
-    function isWebGlSupported() { return !!window.WebGLRenderingContext && !!getWebglCanvas(); }
+    function hasSessionStorage(errorValue) {
+        try {
+            return !!window.sessionStorage;
+        } catch {
+            return errorValue.ERROR;
+        }
+    }
+    function hasLocalStorage(errorValue) {
+        try {
+            return !!window.localStorage;
+        } catch {
+            return errorValue.ERROR;
+        }
+    }
+    function hasIndexedDB(errorValue) {
+        try {
+            return !!window.indexedDB;
+        } catch {
+            return errorValue.ERROR;
+        }
+    }
+    function getWebglCanvas() {
+        const canvas = document.createElement('canvas');
+        try {
+            return canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        } catch {
+            return null;
+        }
+    }
+    function isCanvasSupported() {
+        const canvas = document.createElement('canvas');
+        return !!(canvas.getContext && canvas.getContext('2d'));
+    }
+    function isWebGlSupported() {
+        return !!window.WebGLRenderingContext && !!getWebglCanvas();
+    }
 
     function getCanvasFp(options) {
-      const result = {};
-      const canvas = document.createElement('canvas');
-      canvas.width = 2000; canvas.height = 200; canvas.style.display = 'inline';
-      const ctx = canvas.getContext('2d');
-      ctx.rect(0, 0, 10, 10); ctx.rect(2, 2, 6, 6);
-      result.canvasWinding = ctx.isPointInPath(5, 5, 'evenodd') === false ? 'yes' : 'no';
-      ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#f60'; ctx.fillRect(125, 1, 62, 20);
-      ctx.fillStyle = '#069'; ctx.font = options.dontUseFakeFontInCanvas ? '11pt Arial' : '11pt no-real-font-123'; ctx.fillText('Cwm fjordbank glyphs vext quiz, 😃', 2, 15);
-      ctx.fillStyle = 'rgba(102, 204, 0, 0.2)'; ctx.font = '18pt Arial'; ctx.fillText('Cwm fjordbank glyphs vext quiz, 😃', 4, 45);
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = 'rgb(255,0,255)'; ctx.beginPath(); ctx.arc(50, 50, 50, 0, Math.PI * 2, true); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgb(0,255,255)'; ctx.beginPath(); ctx.arc(100, 50, 50, 0, Math.PI * 2, true); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgb(255,255,0)'; ctx.beginPath(); ctx.arc(75, 100, 50, 0, Math.PI * 2, true); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgb(255,0,255)'; ctx.arc(75, 75, 75, 0, Math.PI * 2, true); ctx.arc(75, 75, 25, 0, Math.PI * 2, true); ctx.fill('evenodd');
-      if (canvas.toDataURL) result.canvasHash = x64hash128(canvas.toDataURL(), 23);
-      return result;
+        const result = {};
+        const canvas = document.createElement('canvas');
+        canvas.width = 2000;
+        canvas.height = 200;
+        canvas.style.display = 'inline';
+        const ctx = canvas.getContext('2d');
+        ctx.rect(0, 0, 10, 10);
+        ctx.rect(2, 2, 6, 6);
+        result.canvasWinding = ctx.isPointInPath(5, 5, 'evenodd') === false ? 'yes' : 'no';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#f60';
+        ctx.fillRect(125, 1, 62, 20);
+        ctx.fillStyle = '#069';
+        ctx.font = options.dontUseFakeFontInCanvas ? '11pt Arial' : '11pt no-real-font-123';
+        ctx.fillText('Cwm fjordbank glyphs vext quiz, 😃', 2, 15);
+        ctx.fillStyle = 'rgba(102, 204, 0, 0.2)';
+        ctx.font = '18pt Arial';
+        ctx.fillText('Cwm fjordbank glyphs vext quiz, 😃', 4, 45);
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = 'rgb(255,0,255)';
+        ctx.beginPath();
+        ctx.arc(50, 50, 50, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgb(0,255,255)';
+        ctx.beginPath();
+        ctx.arc(100, 50, 50, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgb(255,255,0)';
+        ctx.beginPath();
+        ctx.arc(75, 100, 50, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgb(255,0,255)';
+        ctx.arc(75, 75, 75, 0, Math.PI * 2, true);
+        ctx.arc(75, 75, 25, 0, Math.PI * 2, true);
+        ctx.fill('evenodd');
+        if (canvas.toDataURL)
+            result.canvasHash = x64hash128(canvas.toDataURL(), 23);
+        return result;
     }
     function getWebglVendorAndRenderer() {
-      try {
-        const gl = getWebglCanvas();
-        const ext = gl.getExtension('WEBGL_debug_renderer_info');
-        return gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) + '~' + gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
-      } catch { return null; }
+        try {
+            const gl = getWebglCanvas();
+            const ext = gl.getExtension('WEBGL_debug_renderer_info');
+            return gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) + '~' + gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+        } catch {
+            return null;
+        }
     }
     function getWebglFp(options) {
-      const gl = getWebglCanvas();
-      if (!gl) return null;
-      const fmt = (arr) => { gl.clearColor(0, 0, 0, 1); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); return `[${arr[0]}, ${arr[1]}]`; };
-      const out = {};
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      const points = new Float32Array([-0.2, -0.9, 0, 0.4, -0.26, 0, 0, 0.732134444, 0]);
-      gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW); buffer.itemSize = 3; buffer.numItems = 3;
-      const program = gl.createProgram();
-      const vertex = gl.createShader(gl.VERTEX_SHADER);
-      gl.shaderSource(vertex, 'attribute vec2 attrVertex;varying vec2 varyinTexCoordinate;uniform vec2 uniformOffset;void main(){varyinTexCoordinate=attrVertex+uniformOffset;gl_Position=vec4(attrVertex,0,1);}'); gl.compileShader(vertex);
-      const fragment = gl.createShader(gl.FRAGMENT_SHADER);
-      gl.shaderSource(fragment, 'precision mediump float;varying vec2 varyinTexCoordinate;void main() {gl_FragColor=vec4(varyinTexCoordinate,0,1);}'); gl.compileShader(fragment);
-      gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program); gl.useProgram(program);
-      program.vertexPosAttrib = gl.getAttribLocation(program, 'attrVertex'); program.offsetUniform = gl.getUniformLocation(program, 'uniformOffset');
-      gl.enableVertexAttribArray(program.vertexPosAttrib); gl.vertexAttribPointer(program.vertexPosAttrib, buffer.itemSize, gl.FLOAT, false, 0, 0); gl.uniform2f(program.offsetUniform, 1, 1); gl.drawArrays(gl.TRIANGLE_STRIP, 0, buffer.numItems);
-      try { out.webglHash = x64hash128(gl.canvas.toDataURL(), 23); } catch {}
-      if (options.webgl.hashOnly) return out;
-      out.vendorAndRenderer = getWebglVendorAndRenderer();
-      out.extensions = gl.getSupportedExtensions() || [];
-      out['webgl aliased line width range'] = fmt(gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE));
-      out['webgl aliased point size range'] = fmt(gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE));
-      out['webgl alpha bits'] = gl.getParameter(gl.ALPHA_BITS); out['webgl antialiasing'] = gl.getContextAttributes().antialias ? 'yes' : 'no';
-      out['webgl blue bits'] = gl.getParameter(gl.BLUE_BITS); out['webgl depth bits'] = gl.getParameter(gl.DEPTH_BITS); out['webgl green bits'] = gl.getParameter(gl.GREEN_BITS);
-      const ext = gl.getExtension('EXT_texture_filter_anisotropic') || gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic') || gl.getExtension('MOZ_EXT_texture_filter_anisotropic');
-      out['webgl max anisotropy'] = ext ? (gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) || 2) : null;
-      out['webgl max combined texture image units'] = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
-      out['webgl max cube map texture size'] = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
-      out['webgl max fragment uniform vectors'] = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS);
-      out['webgl max render buffer size'] = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
-      out['webgl max texture image units'] = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
-      out['webgl max texture size'] = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-      out['webgl max varying vectors'] = gl.getParameter(gl.MAX_VARYING_VECTORS);
-      out['webgl max vertex attribs'] = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
-      out['webgl max vertex texture image units'] = gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS);
-      out['webgl max vertex uniform vectors'] = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS);
-      out['webgl max viewport dims'] = fmt(gl.getParameter(gl.MAX_VIEWPORT_DIMS));
-      out['webgl red bits'] = gl.getParameter(gl.RED_BITS); out['webgl renderer'] = gl.getParameter(gl.RENDERER); out['webgl shading language version'] = gl.getParameter(gl.SHADING_LANGUAGE_VERSION); out['webgl stencil bits'] = gl.getParameter(gl.STENCIL_BITS); out['webgl vendor'] = gl.getParameter(gl.VENDOR); out['webgl version'] = gl.getParameter(gl.VERSION);
-      try { const dbg = gl.getExtension('WEBGL_debug_renderer_info'); if (dbg) { out['webgl unmasked vendor'] = gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL); out['webgl unmasked renderer'] = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL); } } catch {}
-      if (gl.getShaderPrecisionFormat) {
-        each(['FLOAT', 'INT'], (kind) => each(['VERTEX', 'FRAGMENT'], (shaderType) => each(['HIGH', 'MEDIUM', 'LOW'], (level) => each(['precision', 'rangeMin', 'rangeMax'], (prop) => {
-          let key = prop; const value = gl.getShaderPrecisionFormat(gl[`${shaderType}_SHADER`], gl[`${level}_${kind}`])[prop]; if (prop !== 'precision') key = `precision ${prop}`;
-          out[`webgl ${shaderType.toLowerCase()} shader ${level.toLowerCase()} ${kind.toLowerCase()} ${key}`] = value;
-        }))));
-      }
-      return out;
+        const gl = getWebglCanvas();
+        if (!gl)
+            return null;
+        const fmt = (arr) => {
+            gl.clearColor(0, 0, 0, 1);
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LEQUAL);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            return `[${arr[0]}, ${arr[1]}]`;
+        }
+        ;
+        const out = {};
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        const points = new Float32Array([-0.2, -0.9, 0, 0.4, -0.26, 0, 0, 0.732134444, 0]);
+        gl.bufferData(gl.ARRAY_BUFFER, points, gl.STATIC_DRAW);
+        buffer.itemSize = 3;
+        buffer.numItems = 3;
+        const program = gl.createProgram();
+        const vertex = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertex, 'attribute vec2 attrVertex;varying vec2 varyinTexCoordinate;uniform vec2 uniformOffset;void main(){varyinTexCoordinate=attrVertex+uniformOffset;gl_Position=vec4(attrVertex,0,1);}');
+        gl.compileShader(vertex);
+        const fragment = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragment, 'precision mediump float;varying vec2 varyinTexCoordinate;void main() {gl_FragColor=vec4(varyinTexCoordinate,0,1);}');
+        gl.compileShader(fragment);
+        gl.attachShader(program, vertex);
+        gl.attachShader(program, fragment);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+        program.vertexPosAttrib = gl.getAttribLocation(program, 'attrVertex');
+        program.offsetUniform = gl.getUniformLocation(program, 'uniformOffset');
+        gl.enableVertexAttribArray(program.vertexPosAttrib);
+        gl.vertexAttribPointer(program.vertexPosAttrib, buffer.itemSize, gl.FLOAT, false, 0, 0);
+        gl.uniform2f(program.offsetUniform, 1, 1);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, buffer.numItems);
+        try {
+            out.webglHash = x64hash128(gl.canvas.toDataURL(), 23);
+        } catch {}
+        if (options.webgl.hashOnly)
+            return out;
+        out.vendorAndRenderer = getWebglVendorAndRenderer();
+        out.extensions = gl.getSupportedExtensions() || [];
+        out['webgl aliased line width range'] = fmt(gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE));
+        out['webgl aliased point size range'] = fmt(gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE));
+        out['webgl alpha bits'] = gl.getParameter(gl.ALPHA_BITS);
+        out['webgl antialiasing'] = gl.getContextAttributes().antialias ? 'yes' : 'no';
+        out['webgl blue bits'] = gl.getParameter(gl.BLUE_BITS);
+        out['webgl depth bits'] = gl.getParameter(gl.DEPTH_BITS);
+        out['webgl green bits'] = gl.getParameter(gl.GREEN_BITS);
+        const ext = gl.getExtension('EXT_texture_filter_anisotropic') || gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic') || gl.getExtension('MOZ_EXT_texture_filter_anisotropic');
+        out['webgl max anisotropy'] = ext ? (gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT) || 2) : null;
+        out['webgl max combined texture image units'] = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS);
+        out['webgl max cube map texture size'] = gl.getParameter(gl.MAX_CUBE_MAP_TEXTURE_SIZE);
+        out['webgl max fragment uniform vectors'] = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS);
+        out['webgl max render buffer size'] = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
+        out['webgl max texture image units'] = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
+        out['webgl max texture size'] = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        out['webgl max varying vectors'] = gl.getParameter(gl.MAX_VARYING_VECTORS);
+        out['webgl max vertex attribs'] = gl.getParameter(gl.MAX_VERTEX_ATTRIBS);
+        out['webgl max vertex texture image units'] = gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS);
+        out['webgl max vertex uniform vectors'] = gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS);
+        out['webgl max viewport dims'] = fmt(gl.getParameter(gl.MAX_VIEWPORT_DIMS));
+        out['webgl red bits'] = gl.getParameter(gl.RED_BITS);
+        out['webgl renderer'] = gl.getParameter(gl.RENDERER);
+        out['webgl shading language version'] = gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
+        out['webgl stencil bits'] = gl.getParameter(gl.STENCIL_BITS);
+        out['webgl vendor'] = gl.getParameter(gl.VENDOR);
+        out['webgl version'] = gl.getParameter(gl.VERSION);
+        try {
+            const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+            if (dbg) {
+                out['webgl unmasked vendor'] = gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL);
+                out['webgl unmasked renderer'] = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+            }
+        } catch {}
+        if (gl.getShaderPrecisionFormat) {
+            each(['FLOAT', 'INT'], (kind) => each(['VERTEX', 'FRAGMENT'], (shaderType) => each(['HIGH', 'MEDIUM', 'LOW'], (level) => each(['precision', 'rangeMin', 'rangeMax'], (prop) => {
+                let key = prop;
+                const value = gl.getShaderPrecisionFormat(gl[`${shaderType}_SHADER`], gl[`${level}_${kind}`])[prop];
+                if (prop !== 'precision')
+                    key = `precision ${prop}`;
+                out[`webgl ${shaderType.toLowerCase()} shader ${level.toLowerCase()} ${kind.toLowerCase()} ${key}`] = value;
+            }
+            ))));
+        }
+        return out;
     }
     function getRegularPlugins(options) {
-      if (navigator.plugins === undefined || navigator.plugins === null) return options.NOT_AVAILABLE;
-      let plugins = [];
-      for (let i = 0; i < navigator.plugins.length; i++) if (navigator.plugins[i]) plugins.push(navigator.plugins[i]);
-      if (plugins.length > 0 && options.plugins.sortPluginsFor.some((regex) => navigator.userAgent.match(regex))) {
-        plugins = plugins.sort((a, b) => a.name > b.name ? 1 : a.name < b.name ? -1 : 0);
-      }
-      return map(plugins, (plugin) => [plugin.name, plugin.description, map(plugin, (mime) => [mime.type, mime.suffixes])]);
+        if (navigator.plugins === undefined || navigator.plugins === null)
+            return options.NOT_AVAILABLE;
+        let plugins = [];
+        for (let i = 0; i < navigator.plugins.length; i++)
+            if (navigator.plugins[i])
+                plugins.push(navigator.plugins[i]);
+        if (plugins.length > 0 && options.plugins.sortPluginsFor.some( (regex) => navigator.userAgent.match(regex))) {
+            plugins = plugins.sort( (a, b) => a.name > b.name ? 1 : a.name < b.name ? -1 : 0);
+        }
+        return map(plugins, (plugin) => [plugin.name, plugin.description, map(plugin, (mime) => [mime.type, mime.suffixes])]);
     }
     function getMimeTypes(options) {
-      if (navigator.mimeTypes !== undefined && navigator.mimeTypes !== null) {
-        const items = [];
-        for (let i = 0; i < navigator.mimeTypes.length; i++) items.push({ type: navigator.mimeTypes[i].type, suffixes: navigator.mimeTypes[i].suffixes, description: navigator.mimeTypes[i].description });
-        return items;
-      }
-      return options.NOT_AVAILABLE;
+        if (navigator.mimeTypes !== undefined && navigator.mimeTypes !== null) {
+            const items = [];
+            for (let i = 0; i < navigator.mimeTypes.length; i++)
+                items.push({
+                    type: navigator.mimeTypes[i].type,
+                    suffixes: navigator.mimeTypes[i].suffixes,
+                    description: navigator.mimeTypes[i].description
+                });
+            return items;
+        }
+        return options.NOT_AVAILABLE;
     }
     function detectFonts(options) {
-      const baseFonts = ['monospace', 'sans-serif', 'serif'];
-      let fonts = ['Andale Mono','Arial','Arial Black','Arial Hebrew','Arial MT','Arial Narrow','Arial Rounded MT Bold','Arial Unicode MS','Bitstream Vera Sans Mono','Book Antiqua','Bookman Old Style','Calibri','Cambria','Cambria Math','Century','Century Gothic','Century Schoolbook','Comic Sans','Comic Sans MS','Consolas','Courier','Courier New','Geneva','Georgia','Helvetica','Helvetica Neue','Impact','Lucida Bright','Lucida Calligraphy','Lucida Console','Lucida Fax','LUCIDA GRANDE','Lucida Handwriting','Lucida Sans','Lucida Sans Typewriter','Lucida Sans Unicode','Microsoft Sans Serif','Monaco','Monotype Corsiva','MS Gothic','MS Outlook','MS PGothic','MS Reference Sans Serif','MS Sans Serif','MS Serif','MYRIAD','MYRIAD PRO','Palatino','Palatino Linotype','Segoe Print','Segoe Script','Segoe UI','Segoe UI Light','Segoe UI Semibold','Segoe UI Symbol','Tahoma','Times','Times New Roman','Times New Roman PS','Trebuchet MS','Verdana','Wingdings','Wingdings 2','Wingdings 3'];
-      if (options.fonts.extendedJsFonts !== undefined) fonts = fonts.concat(options.fonts.extendedJsFonts);
-      if (options.fonts.userDefinedFonts !== undefined) fonts = fonts.concat(options.fonts.userDefinedFonts);
-      fonts = fonts.filter((font, index) => fonts.indexOf(font) === index);
-      const body = document.body;
-      const baseContainer = document.createElement('div');
-      const testContainer = document.createElement('div');
-      const defaultWidth = {}; const defaultHeight = {};
-      const createSpan = () => { const s = document.createElement('span'); s.style.position = 'absolute'; s.style.left = '-9999px'; s.style.fontSize = '72px'; s.style.fontStyle = 'normal'; s.style.fontWeight = 'normal'; s.style.letterSpacing = 'normal'; s.style.lineBreak = 'auto'; s.style.lineHeight = 'normal'; s.style.textTransform = 'none'; s.style.textAlign = 'left'; s.style.textDecoration = 'none'; s.style.textShadow = 'none'; s.style.whiteSpace = 'normal'; s.style.wordBreak = 'normal'; s.style.wordSpacing = 'normal'; s.textContent = 'mmmmmmmmmmlli'; return s; };
-      const createSpanWithFonts = (font, baseFont) => { const s = createSpan(); s.style.fontFamily = `'${font}',${baseFont}`; return s; };
-      const hasFont = (spans) => { for (let i = 0; i < baseFonts.length; i++) if (spans[i].offsetWidth !== defaultWidth[baseFonts[i]] || spans[i].offsetHeight !== defaultHeight[baseFonts[i]]) return true; return false; };
-      const baseSpans = baseFonts.map((font) => { const span = createSpan(); span.style.fontFamily = font; baseContainer.appendChild(span); return span; });
-      body.appendChild(baseContainer);
-      for (let i = 0; i < baseFonts.length; i++) { defaultWidth[baseFonts[i]] = baseSpans[i].offsetWidth; defaultHeight[baseFonts[i]] = baseSpans[i].offsetHeight; }
-      const testSpans = {};
-      for (let i = 0; i < fonts.length; i++) { testSpans[fonts[i]] = baseFonts.map((baseFont) => { const span = createSpanWithFonts(fonts[i], baseFont); testContainer.appendChild(span); return span; }); }
-      body.appendChild(testContainer);
-      const available = [];
-      for (let i = 0; i < fonts.length; i++) if (hasFont(testSpans[fonts[i]])) available.push(fonts[i]);
-      body.removeChild(testContainer); body.removeChild(baseContainer);
-      const result = { fontsHash: x64hash128(available.join(), 23) };
-      if (!options.fonts.hashOnly) result.lists = available;
-      return result;
+        const baseFonts = ['monospace', 'sans-serif', 'serif'];
+        let fonts = ['Andale Mono', 'Arial', 'Arial Black', 'Arial Hebrew', 'Arial MT', 'Arial Narrow', 'Arial Rounded MT Bold', 'Arial Unicode MS', 'Bitstream Vera Sans Mono', 'Book Antiqua', 'Bookman Old Style', 'Calibri', 'Cambria', 'Cambria Math', 'Century', 'Century Gothic', 'Century Schoolbook', 'Comic Sans', 'Comic Sans MS', 'Consolas', 'Courier', 'Courier New', 'Geneva', 'Georgia', 'Helvetica', 'Helvetica Neue', 'Impact', 'Lucida Bright', 'Lucida Calligraphy', 'Lucida Console', 'Lucida Fax', 'LUCIDA GRANDE', 'Lucida Handwriting', 'Lucida Sans', 'Lucida Sans Typewriter', 'Lucida Sans Unicode', 'Microsoft Sans Serif', 'Monaco', 'Monotype Corsiva', 'MS Gothic', 'MS Outlook', 'MS PGothic', 'MS Reference Sans Serif', 'MS Sans Serif', 'MS Serif', 'MYRIAD', 'MYRIAD PRO', 'Palatino', 'Palatino Linotype', 'Segoe Print', 'Segoe Script', 'Segoe UI', 'Segoe UI Light', 'Segoe UI Semibold', 'Segoe UI Symbol', 'Tahoma', 'Times', 'Times New Roman', 'Times New Roman PS', 'Trebuchet MS', 'Verdana', 'Wingdings', 'Wingdings 2', 'Wingdings 3'];
+        if (options.fonts.extendedJsFonts !== undefined)
+            fonts = fonts.concat(options.fonts.extendedJsFonts);
+        if (options.fonts.userDefinedFonts !== undefined)
+            fonts = fonts.concat(options.fonts.userDefinedFonts);
+        fonts = fonts.filter( (font, index) => fonts.indexOf(font) === index);
+        const body = document.body;
+        const baseContainer = document.createElement('div');
+        const testContainer = document.createElement('div');
+        const defaultWidth = {};
+        const defaultHeight = {};
+        const createSpan = () => {
+            const s = document.createElement('span');
+            s.style.position = 'absolute';
+            s.style.left = '-9999px';
+            s.style.fontSize = '72px';
+            s.style.fontStyle = 'normal';
+            s.style.fontWeight = 'normal';
+            s.style.letterSpacing = 'normal';
+            s.style.lineBreak = 'auto';
+            s.style.lineHeight = 'normal';
+            s.style.textTransform = 'none';
+            s.style.textAlign = 'left';
+            s.style.textDecoration = 'none';
+            s.style.textShadow = 'none';
+            s.style.whiteSpace = 'normal';
+            s.style.wordBreak = 'normal';
+            s.style.wordSpacing = 'normal';
+            s.textContent = 'mmmmmmmmmmlli';
+            return s;
+        }
+        ;
+        const createSpanWithFonts = (font, baseFont) => {
+            const s = createSpan();
+            s.style.fontFamily = `'${font}',${baseFont}`;
+            return s;
+        }
+        ;
+        const hasFont = (spans) => {
+            for (let i = 0; i < baseFonts.length; i++)
+                if (spans[i].offsetWidth !== defaultWidth[baseFonts[i]] || spans[i].offsetHeight !== defaultHeight[baseFonts[i]])
+                    return true;
+            return false;
+        }
+        ;
+        const baseSpans = baseFonts.map( (font) => {
+            const span = createSpan();
+            span.style.fontFamily = font;
+            baseContainer.appendChild(span);
+            return span;
+        }
+        );
+        body.appendChild(baseContainer);
+        for (let i = 0; i < baseFonts.length; i++) {
+            defaultWidth[baseFonts[i]] = baseSpans[i].offsetWidth;
+            defaultHeight[baseFonts[i]] = baseSpans[i].offsetHeight;
+        }
+        const testSpans = {};
+        for (let i = 0; i < fonts.length; i++) {
+            testSpans[fonts[i]] = baseFonts.map( (baseFont) => {
+                const span = createSpanWithFonts(fonts[i], baseFont);
+                testContainer.appendChild(span);
+                return span;
+            }
+            );
+        }
+        body.appendChild(testContainer);
+        const available = [];
+        for (let i = 0; i < fonts.length; i++)
+            if (hasFont(testSpans[fonts[i]]))
+                available.push(fonts[i]);
+        body.removeChild(testContainer);
+        body.removeChild(baseContainer);
+        const result = {
+            fontsHash: x64hash128(available.join(), 23)
+        };
+        if (!options.fonts.hashOnly)
+            result.lists = available;
+        return result;
     }
 
-    const collectors = [
-      { key: 'webrtc', getData: (cb, options) => { try { const RTCP = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || window.msRTCPeerConnection; if (!RTCP) return cb(options.NOT_AVAILABLE); const ips = {}; const pc = new RTCP({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }, { optional: [{ RtpDataChannels: true }] }); const add = (candidate) => { if (candidate !== null) { try { const ip = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(candidate)[1]; ips[ip] = true; } catch {} } }; let done = false; const finish = () => { if (done) return; done = true; const desc = pc.localDescription; if (desc !== null) desc.sdp.split('\n').forEach((line) => { if (line.indexOf('a=candidate:') === 0 || line.indexOf('c=IN') === 0) add(line); }); cb({ ips: Object.keys(ips) }); }; pc.onicecandidate = (event) => event.candidate && add(event.candidate.candidate); pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && finish(); pc.createDataChannel('bl'); try { pc.createOffer().then((offer) => pc.setLocalDescription(offer)); } catch { finish(); } setTimeout(finish, 2000); } catch (error) { cb({ exception: { name: error.name, message: error.message } }); } }, dataLimit: 1000 },
-      { key: 'enumerateDevices', getData: (cb, options) => { if (!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices)) return cb(options.NOT_AVAILABLE); navigator.mediaDevices.enumerateDevices().then((items) => cb(items.map((item) => ({ id: item.deviceId, gid: item.groupId, kind: item.kind, label: item.label })))).catch((error) => cb(String(error))); }, dataLimit: 22000 },
-      { key: 'appName', getData: (cb, options) => cb(navigator.appName || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'tsSeed', getData: (cb) => cb(Date.now()), dataLimit: 100 },
-      { key: 'appVersion', getData: (cb, options) => cb(navigator.appVersion || options.NOT_AVAILABLE), dataLimit: 300 },
-      { key: 'appCodeName', getData: (cb, options) => cb(navigator.appCodeName || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'location', getData: (cb, options) => cb({ hash: location.hash || options.NOT_AVAILABLE, host: location.host || options.NOT_AVAILABLE, hostname: location.hostname || options.NOT_AVAILABLE, href: location.href || options.NOT_AVAILABLE, origin: location.origin || options.NOT_AVAILABLE, pathname: location.pathname || options.NOT_AVAILABLE, port: location.port || options.NOT_AVAILABLE, protocol: location.protocol || options.NOT_AVAILABLE }), dataLimit: 1500 },
-      { key: 'javascripts', getData: (cb, options) => cb(document.scripts == null ? options.NOT_AVAILABLE : []), dataLimit: 2200 },
-      { key: 'platform', getData: (cb, options) => cb(navigator.platform || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'product', getData: (cb, options) => cb(navigator.product || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'productSub', getData: (cb, options) => cb(navigator.productSub || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'cpuClass', getData: (cb, options) => cb(navigator.cpuClass || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'oscpu', getData: (cb, options) => cb(navigator.oscpu || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'hardwareConcurrency', alias: 'numOfCores', getData: (cb, options) => cb(navigator.hardwareConcurrency || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'deviceMemory', getData: (cb, options) => { let value = navigator.deviceMemory || options.NOT_AVAILABLE; if (value !== options.NOT_AVAILABLE) value += ' GB'; cb(value); }, dataLimit: 100 },
-      { key: 'vendor', getData: (cb, options) => cb(navigator.vendor || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'vendorSub', getData: (cb, options) => cb(navigator.vendorSub || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'language', getData: (cb, options) => cb(navigator.language || navigator.userLanguage || navigator.browserLanguage || navigator.systemLanguage || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'timezoneOffset', getData: (cb) => cb(new Date().getTimezoneOffset() / 60), dataLimit: 100 },
-      { key: 'timezone', getData: (cb, options) => cb(window.Intl && window.Intl.DateTimeFormat ? new Intl.DateTimeFormat().resolvedOptions().timeZone : options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'userAgent', getData: (cb) => cb(navigator.userAgent), dataLimit: 1500 },
-      { key: 'webdriver', getData: (cb, options) => cb(navigator.webdriver === undefined || navigator.webdriver === null ? options.NOT_AVAILABLE : navigator.webdriver), dataLimit: 100 },
-      { key: 'doNotTrack', getData: (cb, options) => cb(navigator.doNotTrack || navigator.msDoNotTrack || window.doNotTrack || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'incognito', getData: (cb, options) => { const parts = getBrowserNameAndVersion().split(' '); const browser = parts[0]; const version = parts[1]; let value = options.NOT_AVAILABLE; if (browser === 'Chrome') { if (parseInt(version, 10) <= 74) { const requestFileSystem = window.RequestFileSystem || window.webkitRequestFileSystem; if (requestFileSystem) requestFileSystem(window.TEMPORARY, 100, () => cb(false), () => cb(true)); else cb(value); } else if ('storage' in navigator && 'estimate' in navigator.storage) navigator.storage.estimate().then((r) => cb(r.quota < 125829120)); else cb(value); } else if (browser === 'Firefox') { const req = indexedDB.open('test'); req.onerror = () => cb(true); req.onsuccess = () => cb(false); } else cb(value); }, dataLimit: 100 },
-      { key: 'colorDepth', getData: (cb, options) => cb(screen.colorDepth || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'pixelDepth', getData: (cb, options) => cb(screen.pixelDepth || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'pixelRatio', getData: (cb, options) => cb(window.devicePixelRatio || options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'screenResolution', getData: (cb) => cb({ w: screen.width, h: screen.height }), dataLimit: 100 },
-      { key: 'screenOrientation', getData: (cb, options) => options.screen.detectScreenOrientation ? cb({ Enabled: screen.orientation !== undefined, Orientation: screen.msOrientation || screen.mozOrientation || (screen.orientation || {}).type }) : cb(options.EXCLUDED), dataLimit: 100 },
-      { key: 'availableScreenResolution', getData: (cb, options) => cb(screen.availWidth && screen.availHeight ? { w: screen.availWidth, h: screen.availHeight } : options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'sessionStorage', getData: (cb, options) => cb(hasSessionStorage(options)), dataLimit: 100 },
-      { key: 'localStorage', getData: (cb, options) => cb(hasLocalStorage(options)), dataLimit: 100 },
-      { key: 'indexedDb', getData: (cb, options) => cb(hasIndexedDB(options)), dataLimit: 100 },
-      { key: 'addBehavior', getData: (cb) => cb(!(!document.body || !document.body.addBehavior)), dataLimit: 100 },
-      { key: 'openDatabase', getData: (cb) => cb(!!window.openDatabase), dataLimit: 100 },
-      { key: 'canvas', getData: (cb, options) => cb(isCanvasSupported() ? getCanvasFp(options) : options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'webgl', getData: (cb, options) => cb(isWebGlSupported() ? getWebglFp(options) : options.NOT_AVAILABLE), dataLimit: 6000 },
-      { key: 'signals', getData: (cb) => cb({ adBlockInstalled: getAdBlock(), liedLanguages: getHasLiedLanguages(), liedResolution: getHasLiedResolution(), liedOS: getHasLiedOs(), liedBrowser: getHasLiedBrowser() }), dataLimit: 150 },
-      { key: 'touchSupport', getData: (cb) => cb(getTouchSupport()), dataLimit: 100 },
-      { key: 'networkInfo', getData: (cb, options) => { const n = navigator.connection; cb(n !== undefined ? { downlink: n.downlink, downlinkMax: n.downlinkMax, type: n.type, effectiveType: n.effectiveType, rtt: n.rtt, saveData: n.saveData } : options.NOT_AVAILABLE); }, dataLimit: 150 },
-      { key: 'battery', getData: (cb, options) => navigator.getBattery ? navigator.getBattery().then((battery) => cb({ level: battery.level, charging: battery.charging, chargingTime: battery.chargingTime, dischargingTime: battery.dischargingTime })) : cb(options.NOT_AVAILABLE), dataLimit: 100 },
-      { key: 'audio', getData: (cb, options) => { if (options.audio.excludeIOS11 && navigator.userAgent.match(/OS 11.+Version\/11.+Safari/)) return cb(options.EXCLUDED); const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (Ctx == null) return cb(options.NOT_AVAILABLE); let ctx = new Ctx(1, 44100, 44100); const oscillator = ctx.createOscillator(); oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(10000, ctx.currentTime); const compressor = ctx.createDynamicsCompressor(); each([['threshold', -50], ['knee', 40], ['ratio', 12], ['reduction', -20], ['attack', 0], ['release', 0.25]], (item) => { if (compressor[item[0]] && typeof compressor[item[0]].setValueAtTime === 'function') compressor[item[0]].setValueAtTime(item[1], ctx.currentTime); }); oscillator.connect(compressor); compressor.connect(ctx.destination); oscillator.start(0); ctx.startRendering(); const timer = setTimeout(() => { ctx.oncomplete = function () {}; ctx = null; cb('audioTimeout'); }, options.audio.timeout); ctx.oncomplete = (event) => { try { clearTimeout(timer); const value = event.renderedBuffer.getChannelData(0).slice(4500, 5000).reduce((sum, item) => sum + Math.abs(item), 0).toString(); oscillator.disconnect(); compressor.disconnect(); cb(value); } catch (error) { cb(String(error)); } }; }, dataLimit: 100 },
-      { key: 'automation', getData: (cb, options) => { if (getHasLiedBrowser()) cb('undetected, fake browser'); else { const browser = getBrowserNameAndVersion().split(' ')[0]; if (browser === 'Chrome' && navigator.webdriver === true) cb('Selenium'); else if ((browser === 'Firefox' && document.documentElement.getAttribute('webdriver')) || '_Selenium_IDE_Recorder' in window || '__webdriver_script_fn' in document) cb('Selenium'); else if (window.callPhantom || window._phantom) cb('PhantomJS'); else cb(options.NOT_AVAILABLE); } }, dataLimit: 100 },
-      { key: 'plugins', getData: (cb, options) => cb(getRegularPlugins(options)), dataLimit: 17000 },
-      { key: 'mimetyps', getData: (cb, options) => cb(getMimeTypes(options)), dataLimit: 27000 },
-      { key: 'fonts', getData: (cb, options) => { try { cb(detectFonts(options)); } catch (error) { cb(String(error)); } }, dataLimit: 1500 },
-      { key: 'fontsFlash', getData: (cb, options) => cb(options.EXCLUDED), dataLimit: 100 }
-    ];
+    const collectors = [{
+        key: 'webrtc',
+        getData: (cb, options) => {
+            try {
+                const RTCP = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection || window.msRTCPeerConnection;
+                if (!RTCP)
+                    return cb(options.NOT_AVAILABLE);
+                const ips = {};
+                const pc = new RTCP({
+                    iceServers: [{
+                        urls: 'stun:stun.l.google.com:19302'
+                    }]
+                },{
+                    optional: [{
+                        RtpDataChannels: true
+                    }]
+                });
+                const add = (candidate) => {
+                    if (candidate !== null) {
+                        try {
+                            const ip = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(candidate)[1];
+                            ips[ip] = true;
+                        } catch {}
+                    }
+                }
+                ;
+                let done = false;
+                const finish = () => {
+                    if (done)
+                        return;
+                    done = true;
+                    const desc = pc.localDescription;
+                    if (desc !== null)
+                        desc.sdp.split('\n').forEach( (line) => {
+                            if (line.indexOf('a=candidate:') === 0 || line.indexOf('c=IN') === 0)
+                                add(line);
+                        }
+                        );
+                    cb({
+                        ips: Object.keys(ips)
+                    });
+                }
+                ;
+                pc.onicecandidate = (event) => event.candidate && add(event.candidate.candidate);
+                pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && finish();
+                pc.createDataChannel('bl');
+                try {
+                    pc.createOffer().then( (offer) => pc.setLocalDescription(offer));
+                } catch {
+                    finish();
+                }
+                setTimeout(finish, 2000);
+            } catch (error) {
+                cb({
+                    exception: {
+                        name: error.name,
+                        message: error.message
+                    }
+                });
+            }
+        }
+        ,
+        dataLimit: 1000
+    }, {
+        key: 'enumerateDevices',
+        getData: (cb, options) => {
+            if (!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices))
+                return cb(options.NOT_AVAILABLE);
+            navigator.mediaDevices.enumerateDevices().then( (items) => cb(items.map( (item) => ({
+                id: item.deviceId,
+                gid: item.groupId,
+                kind: item.kind,
+                label: item.label
+            })))).catch( (error) => cb(String(error)));
+        }
+        ,
+        dataLimit: 22000
+    }, {
+        key: 'appName',
+        getData: (cb, options) => cb(navigator.appName || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'tsSeed',
+        getData: (cb) => cb(Date.now()),
+        dataLimit: 100
+    }, {
+        key: 'appVersion',
+        getData: (cb, options) => cb(navigator.appVersion || options.NOT_AVAILABLE),
+        dataLimit: 300
+    }, {
+        key: 'appCodeName',
+        getData: (cb, options) => cb(navigator.appCodeName || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'location',
+        getData: (cb, options) => cb({
+            hash: location.hash || options.NOT_AVAILABLE,
+            host: location.host || options.NOT_AVAILABLE,
+            hostname: location.hostname || options.NOT_AVAILABLE,
+            href: location.href || options.NOT_AVAILABLE,
+            origin: location.origin || options.NOT_AVAILABLE,
+            pathname: location.pathname || options.NOT_AVAILABLE,
+            port: location.port || options.NOT_AVAILABLE,
+            protocol: location.protocol || options.NOT_AVAILABLE
+        }),
+        dataLimit: 1500
+    }, {
+        key: 'javascripts',
+        getData: (cb, options) => cb(document.scripts == null ? options.NOT_AVAILABLE : []),
+        dataLimit: 2200
+    }, {
+        key: 'platform',
+        getData: (cb, options) => cb(navigator.platform || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'product',
+        getData: (cb, options) => cb(navigator.product || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'productSub',
+        getData: (cb, options) => cb(navigator.productSub || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'cpuClass',
+        getData: (cb, options) => cb(navigator.cpuClass || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'oscpu',
+        getData: (cb, options) => cb(navigator.oscpu || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'hardwareConcurrency',
+        alias: 'numOfCores',
+        getData: (cb, options) => cb(navigator.hardwareConcurrency || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'deviceMemory',
+        getData: (cb, options) => {
+            let value = navigator.deviceMemory || options.NOT_AVAILABLE;
+            if (value !== options.NOT_AVAILABLE)
+                value += ' GB';
+            cb(value);
+        }
+        ,
+        dataLimit: 100
+    }, {
+        key: 'vendor',
+        getData: (cb, options) => cb(navigator.vendor || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'vendorSub',
+        getData: (cb, options) => cb(navigator.vendorSub || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'language',
+        getData: (cb, options) => cb(navigator.language || navigator.userLanguage || navigator.browserLanguage || navigator.systemLanguage || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'timezoneOffset',
+        getData: (cb) => cb(new Date().getTimezoneOffset() / 60),
+        dataLimit: 100
+    }, {
+        key: 'timezone',
+        getData: (cb, options) => cb(window.Intl && window.Intl.DateTimeFormat ? new Intl.DateTimeFormat().resolvedOptions().timeZone : options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'userAgent',
+        getData: (cb) => cb(navigator.userAgent),
+        dataLimit: 1500
+    }, {
+        key: 'webdriver',
+        getData: (cb, options) => cb(navigator.webdriver === undefined || navigator.webdriver === null ? options.NOT_AVAILABLE : navigator.webdriver),
+        dataLimit: 100
+    }, {
+        key: 'doNotTrack',
+        getData: (cb, options) => cb(navigator.doNotTrack || navigator.msDoNotTrack || window.doNotTrack || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'incognito',
+        getData: (cb, options) => {
+            const parts = getBrowserNameAndVersion().split(' ');
+            const browser = parts[0];
+            const version = parts[1];
+            let value = options.NOT_AVAILABLE;
+            if (browser === 'Chrome') {
+                if (parseInt(version, 10) <= 74) {
+                    const requestFileSystem = window.RequestFileSystem || window.webkitRequestFileSystem;
+                    if (requestFileSystem)
+                        requestFileSystem(window.TEMPORARY, 100, () => cb(false), () => cb(true));
+                    else
+                        cb(value);
+                } else if ('storage'in navigator && 'estimate'in navigator.storage)
+                    navigator.storage.estimate().then( (r) => cb(r.quota < 125829120));
+                else
+                    cb(value);
+            } else if (browser === 'Firefox') {
+                const req = indexedDB.open('test');
+                req.onerror = () => cb(true);
+                req.onsuccess = () => cb(false);
+            } else
+                cb(value);
+        }
+        ,
+        dataLimit: 100
+    }, {
+        key: 'colorDepth',
+        getData: (cb, options) => cb(screen.colorDepth || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'pixelDepth',
+        getData: (cb, options) => cb(screen.pixelDepth || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'pixelRatio',
+        getData: (cb, options) => cb(window.devicePixelRatio || options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'screenResolution',
+        getData: (cb) => cb({
+            w: screen.width,
+            h: screen.height
+        }),
+        dataLimit: 100
+    }, {
+        key: 'screenOrientation',
+        getData: (cb, options) => options.screen.detectScreenOrientation ? cb({
+            Enabled: screen.orientation !== undefined,
+            Orientation: screen.msOrientation || screen.mozOrientation || (screen.orientation || {}).type
+        }) : cb(options.EXCLUDED),
+        dataLimit: 100
+    }, {
+        key: 'availableScreenResolution',
+        getData: (cb, options) => cb(screen.availWidth && screen.availHeight ? {
+            w: screen.availWidth,
+            h: screen.availHeight
+        } : options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'sessionStorage',
+        getData: (cb, options) => cb(hasSessionStorage(options)),
+        dataLimit: 100
+    }, {
+        key: 'localStorage',
+        getData: (cb, options) => cb(hasLocalStorage(options)),
+        dataLimit: 100
+    }, {
+        key: 'indexedDb',
+        getData: (cb, options) => cb(hasIndexedDB(options)),
+        dataLimit: 100
+    }, {
+        key: 'addBehavior',
+        getData: (cb) => cb(!(!document.body || !document.body.addBehavior)),
+        dataLimit: 100
+    }, {
+        key: 'openDatabase',
+        getData: (cb) => cb(!!window.openDatabase),
+        dataLimit: 100
+    }, {
+        key: 'canvas',
+        getData: (cb, options) => cb(isCanvasSupported() ? getCanvasFp(options) : options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'webgl',
+        getData: (cb, options) => cb(isWebGlSupported() ? getWebglFp(options) : options.NOT_AVAILABLE),
+        dataLimit: 6000
+    }, {
+        key: 'signals',
+        getData: (cb) => cb({
+            adBlockInstalled: getAdBlock(),
+            liedLanguages: getHasLiedLanguages(),
+            liedResolution: getHasLiedResolution(),
+            liedOS: getHasLiedOs(),
+            liedBrowser: getHasLiedBrowser()
+        }),
+        dataLimit: 150
+    }, {
+        key: 'touchSupport',
+        getData: (cb) => cb(getTouchSupport()),
+        dataLimit: 100
+    }, {
+        key: 'networkInfo',
+        getData: (cb, options) => {
+            const n = navigator.connection;
+            cb(n !== undefined ? {
+                downlink: n.downlink,
+                downlinkMax: n.downlinkMax,
+                type: n.type,
+                effectiveType: n.effectiveType,
+                rtt: n.rtt,
+                saveData: n.saveData
+            } : options.NOT_AVAILABLE);
+        }
+        ,
+        dataLimit: 150
+    }, {
+        key: 'battery',
+        getData: (cb, options) => navigator.getBattery ? navigator.getBattery().then( (battery) => cb({
+            level: battery.level,
+            charging: battery.charging,
+            chargingTime: battery.chargingTime,
+            dischargingTime: battery.dischargingTime
+        })) : cb(options.NOT_AVAILABLE),
+        dataLimit: 100
+    }, {
+        key: 'audio',
+        getData: (cb, options) => {
+            if (options.audio.excludeIOS11 && navigator.userAgent.match(/OS 11.+Version\/11.+Safari/))
+                return cb(options.EXCLUDED);
+            const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+            if (Ctx == null)
+                return cb(options.NOT_AVAILABLE);
+            let ctx = new Ctx(1,44100,44100);
+            const oscillator = ctx.createOscillator();
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(10000, ctx.currentTime);
+            const compressor = ctx.createDynamicsCompressor();
+            each([['threshold', -50], ['knee', 40], ['ratio', 12], ['reduction', -20], ['attack', 0], ['release', 0.25]], (item) => {
+                if (compressor[item[0]] && typeof compressor[item[0]].setValueAtTime === 'function')
+                    compressor[item[0]].setValueAtTime(item[1], ctx.currentTime);
+            }
+            );
+            oscillator.connect(compressor);
+            compressor.connect(ctx.destination);
+            oscillator.start(0);
+            ctx.startRendering();
+            const timer = setTimeout( () => {
+                ctx.oncomplete = function() {}
+                ;
+                ctx = null;
+                cb('audioTimeout');
+            }
+            , options.audio.timeout);
+            ctx.oncomplete = (event) => {
+                try {
+                    clearTimeout(timer);
+                    const value = event.renderedBuffer.getChannelData(0).slice(4500, 5000).reduce( (sum, item) => sum + Math.abs(item), 0).toString();
+                    oscillator.disconnect();
+                    compressor.disconnect();
+                    cb(value);
+                } catch (error) {
+                    cb(String(error));
+                }
+            }
+            ;
+        }
+        ,
+        dataLimit: 100
+    }, {
+        key: 'automation',
+        getData: (cb, options) => {
+            if (getHasLiedBrowser())
+                cb('undetected, fake browser');
+            else {
+                const browser = getBrowserNameAndVersion().split(' ')[0];
+                if (browser === 'Chrome' && navigator.webdriver === true)
+                    cb('Selenium');
+                else if ((browser === 'Firefox' && document.documentElement.getAttribute('webdriver')) || '_Selenium_IDE_Recorder'in window || '__webdriver_script_fn'in document)
+                    cb('Selenium');
+                else if (window.callPhantom || window._phantom)
+                    cb('PhantomJS');
+                else
+                    cb(options.NOT_AVAILABLE);
+            }
+        }
+        ,
+        dataLimit: 100
+    }, {
+        key: 'plugins',
+        getData: (cb, options) => cb(getRegularPlugins(options)),
+        dataLimit: 17000
+    }, {
+        key: 'mimetyps',
+        getData: (cb, options) => cb(getMimeTypes(options)),
+        dataLimit: 27000
+    }, {
+        key: 'fonts',
+        getData: (cb, options) => {
+            try {
+                cb(detectFonts(options));
+            } catch (error) {
+                cb(String(error));
+            }
+        }
+        ,
+        dataLimit: 1500
+    }, {
+        key: 'fontsFlash',
+        getData: (cb, options) => cb(options.EXCLUDED),
+        dataLimit: 100
+    }];
 
-    const COLLECTOR_KEYS = collectors.map((item) => item.alias || item.key);
+    const COLLECTOR_KEYS = collectors.map( (item) => item.alias || item.key);
 
     function renderCollectorBadges() {
-      ui.collectorGrid.innerHTML = '';
-      COLLECTOR_KEYS.forEach((key) => {
-        const state = collectorState.get(key) || 'idle';
-        const el = document.createElement('div');
-        el.className = `badge ${state === 'idle' ? '' : state}`.trim();
-        el.textContent = key;
-        ui.collectorGrid.appendChild(el);
-      });
+        ui.collectorGrid.innerHTML = '';
+        COLLECTOR_KEYS.forEach( (key) => {
+            const state = collectorState.get(key) || 'idle';
+            const el = document.createElement('div');
+            el.className = `badge ${state === 'idle' ? '' : state}`.trim();
+            el.textContent = key;
+            ui.collectorGrid.appendChild(el);
+        }
+        );
     }
-    function setCollectorState(key, state) { collectorState.set(key, state); renderCollectorBadges(); }
+    function setCollectorState(key, state) {
+        collectorState.set(key, state);
+        renderCollectorBadges();
+    }
 
     function mapArrayEntries(items, mapObj) {
-      if (!Array.isArray(items)) return items;
-      return items.map((item) => mapObj && Object.prototype.hasOwnProperty.call(mapObj, item) ? mapObj[item] : item);
+        if (!Array.isArray(items))
+            return items;
+        return items.map( (item) => mapObj && Object.prototype.hasOwnProperty.call(mapObj, item) ? mapObj[item] : item);
     }
     function remapObjectKeys(input, mapObj) {
-      const out = {};
-      Object.keys(mapObj).forEach((key) => { if (input && Object.prototype.hasOwnProperty.call(input, key)) out[mapObj[key]] = input[key]; });
-      return out;
+        const out = {};
+        Object.keys(mapObj).forEach( (key) => {
+            if (input && Object.prototype.hasOwnProperty.call(input, key))
+                out[mapObj[key]] = input[key];
+        }
+        );
+        return out;
     }
     function remapFeatures(features) {
-      const cloned = JSON.parse(JSON.stringify(features));
-      if (cloned.webgl && cloned.webgl.extensions) cloned.webgl.extensions = mapArrayEntries(cloned.webgl.extensions, S);
-      if (cloned.webgl) cloned.webgl = remapObjectKeys(cloned.webgl, _);
-      if (cloned.touchSupport) cloned.touchSupport = remapObjectKeys(cloned.touchSupport, T);
-      if (cloned.battery) cloned.battery = remapObjectKeys(cloned.battery, w);
-      if (cloned.screenOrientation) cloned.screenOrientation = remapObjectKeys(cloned.screenOrientation, b);
-      if (cloned.fonts) { if (cloned.fonts.lists) cloned.fonts.lists = mapArrayEntries(cloned.fonts.lists, I); cloned.fonts = remapObjectKeys(cloned.fonts, E); }
-      if (Array.isArray(cloned.enumerateDevices)) cloned.enumerateDevices = cloned.enumerateDevices.map((item) => remapObjectKeys(item, y));
-      if (cloned.canvas) cloned.canvas = remapObjectKeys(cloned.canvas, m);
-      if (Array.isArray(cloned.mimetyps)) cloned.mimetyps = cloned.mimetyps.map((item) => remapObjectKeys(item, v));
-      if (cloned.signals) cloned.signals = remapObjectKeys(cloned.signals, g);
-      if (cloned.networkInfo) cloned.networkInfo = remapObjectKeys(cloned.networkInfo, p);
-      if (cloned.location) cloned.location = remapObjectKeys(cloned.location, f);
-      if (cloned.FPDataCookie) cloned.FPDataCookie = remapObjectKeys(cloned.FPDataCookie, h);
-      const out = {};
-      Object.keys(A).forEach((key) => { out[A[key]] = cloned[key]; });
-      return out;
+        const cloned = JSON.parse(JSON.stringify(features));
+        if (cloned.webgl && cloned.webgl.extensions)
+            cloned.webgl.extensions = mapArrayEntries(cloned.webgl.extensions, S);
+        if (cloned.webgl)
+            cloned.webgl = remapObjectKeys(cloned.webgl, _);
+        if (cloned.touchSupport)
+            cloned.touchSupport = remapObjectKeys(cloned.touchSupport, T);
+        if (cloned.battery)
+            cloned.battery = remapObjectKeys(cloned.battery, w);
+        if (cloned.screenOrientation)
+            cloned.screenOrientation = remapObjectKeys(cloned.screenOrientation, b);
+        if (cloned.fonts) {
+            if (cloned.fonts.lists)
+                cloned.fonts.lists = mapArrayEntries(cloned.fonts.lists, I);
+            cloned.fonts = remapObjectKeys(cloned.fonts, E);
+        }
+        if (Array.isArray(cloned.enumerateDevices))
+            cloned.enumerateDevices = cloned.enumerateDevices.map( (item) => remapObjectKeys(item, y));
+        if (cloned.canvas)
+            cloned.canvas = remapObjectKeys(cloned.canvas, m);
+        if (Array.isArray(cloned.mimetyps))
+            cloned.mimetyps = cloned.mimetyps.map( (item) => remapObjectKeys(item, v));
+        if (cloned.signals)
+            cloned.signals = remapObjectKeys(cloned.signals, g);
+        if (cloned.networkInfo)
+            cloned.networkInfo = remapObjectKeys(cloned.networkInfo, p);
+        if (cloned.location)
+            cloned.location = remapObjectKeys(cloned.location, f);
+        if (cloned.FPDataCookie)
+            cloned.FPDataCookie = remapObjectKeys(cloned.FPDataCookie, h);
+        const out = {};
+        Object.keys(A).forEach( (key) => {
+            out[A[key]] = cloned[key];
+        }
+        );
+        return out;
     }
 
     async function getFeatures(options, runId) {
-      return new Promise((resolve) => {
-        const merged = JSON.parse(JSON.stringify(DEFAULTS));
-        Object.assign(merged, options || {});
-        merged.excludes = Object.assign({}, DEFAULTS.excludes, options && options.excludes ? options.excludes : {});
-        const data = { latency: { acq_time: {} }, errors: {} };
-        const started = performance.now();
-        let total = 0;
-        let done = 0;
-        const times = {};
-        collectors.forEach((item) => { if (!merged.excludes[item.key]) total++; else setCollectorState(item.alias || item.key, 'excluded'); });
-        ui.collectorChip.textContent = `${done} / ${total}`;
-        const finalize = (full) => {
-          data.latency.acq_time.allFeatures = Math.round(performance.now() - started);
-          data.allFeaturesCollectionAt = Date.now();
-          resolve({ data, full });
-        };
-        if (!total) { finalize(true); return; }
-        collectors.forEach((item) => {
-          if (merged.excludes[item.key]) return;
-          const key = item.alias || item.key;
-          const runner = () => {
-            if (runId !== activeRunId) return;
-            times[key] = performance.now();
-            setCollectorState(key, 'running');
-            ui.currentCollectorChip.textContent = key;
-            ui.statusLine.innerHTML = `Collecting ${key}<span class="cursor"></span>`;
-            try {
-              item.getData((value) => {
-                if (runId !== activeRunId) return;
-                let processed = maybeApplyPreprocessor(value, merged.preprocessor, key);
-                const limit = typeof item.dataLimit === 'number' ? item.dataLimit : 1000;
-                const length = toJsonLength(processed);
-                if (length > limit) {
-                  data.errors[key] = `Exceeded current data limit:${limit} Data length for:${key} was found to be:${length}`;
-                  processed = {};
-                }
-                data[key] = processed;
-                data.latency.acq_time[key] = Math.round(performance.now() - times[key]);
-                setCollectorState(key, processed === merged.EXCLUDED ? 'excluded' : 'done');
-                done += 1;
-                ui.collectorChip.textContent = `${done} / ${total}`;
-                ui.progressFill.style.width = `${(done / total) * 100}%`;
-                if (done >= total) finalize(true);
-              }, merged);
-            } catch (error) {
-              data.errors[key] = String(error);
-              setCollectorState(key, 'error');
-              done += 1;
-              if (done >= total) finalize(true);
+        return new Promise( (resolve) => {
+            const merged = JSON.parse(JSON.stringify(DEFAULTS));
+            Object.assign(merged, options || {});
+            merged.excludes = Object.assign({}, DEFAULTS.excludes, options && options.excludes ? options.excludes : {});
+            const data = {
+                latency: {
+                    acq_time: {}
+                },
+                errors: {}
+            };
+            const started = performance.now();
+            let total = 0;
+            let done = 0;
+            const times = {};
+            collectors.forEach( (item) => {
+                if (!merged.excludes[item.key])
+                    total++;
+                else
+                    setCollectorState(item.alias || item.key, 'excluded');
             }
-          };
-          if (window.requestIdleCallback && merged.useRequestIdleCallBack !== false) requestIdleCallback(runner); else runner();
-        });
-      });
+            );
+            ui.collectorChip.textContent = `${done} / ${total}`;
+            const finalize = (full) => {
+                data.latency.acq_time.allFeatures = Math.round(performance.now() - started);
+                data.allFeaturesCollectionAt = Date.now();
+                resolve({
+                    data,
+                    full
+                });
+            }
+            ;
+            if (!total) {
+                finalize(true);
+                return;
+            }
+            collectors.forEach( (item) => {
+                if (merged.excludes[item.key])
+                    return;
+                const key = item.alias || item.key;
+                const runner = () => {
+                    if (runId !== activeRunId)
+                        return;
+                    times[key] = performance.now();
+                    setCollectorState(key, 'running');
+                    ui.currentCollectorChip.textContent = key;
+                    ui.statusLine.innerHTML = `Collecting ${key}<span class="cursor"></span>`;
+                    try {
+                        item.getData( (value) => {
+                            if (runId !== activeRunId)
+                                return;
+                            let processed = maybeApplyPreprocessor(value, merged.preprocessor, key);
+                            const limit = typeof item.dataLimit === 'number' ? item.dataLimit : 1000;
+                            const length = toJsonLength(processed);
+                            if (length > limit) {
+                                data.errors[key] = `Exceeded current data limit:${limit} Data length for:${key} was found to be:${length}`;
+                                processed = {};
+                            }
+                            data[key] = processed;
+                            data.latency.acq_time[key] = Math.round(performance.now() - times[key]);
+                            setCollectorState(key, processed === merged.EXCLUDED ? 'excluded' : 'done');
+                            done += 1;
+                            ui.collectorChip.textContent = `${done} / ${total}`;
+                            ui.progressFill.style.width = `${(done / total) * 100}%`;
+                            if (done >= total)
+                                finalize(true);
+                        }
+                        , merged);
+                    } catch (error) {
+                        data.errors[key] = String(error);
+                        setCollectorState(key, 'error');
+                        done += 1;
+                        if (done >= total)
+                            finalize(true);
+                    }
+                }
+                ;
+                if (window.requestIdleCallback && merged.useRequestIdleCallBack !== false)
+                    requestIdleCallback(runner);
+                else
+                    runner();
+            }
+            );
+        }
+        );
     }
 
     function resetUi() {
-      ui.sessionChip.textContent = 'Idle';
-      ui.phaseChip.textContent = 'Waiting';
-      ui.currentCollectorChip.textContent = '—';
-      ui.elapsedChip.textContent = '0 ms';
-      ui.collectorChip.textContent = '0 / 0';
-      ui.progressFill.style.width = '0%';
-      ui.statusLine.innerHTML = 'Ready<span class="cursor"></span>';
-      ui.rawOutput.textContent = '{}';
-      ui.mappedOutput.textContent = '{}';
-      ui.hashOutput.textContent = '—';
-      ui.compressedOutput.textContent = '';
-      ui.encryptedOutput.textContent = '';
-      ui.rawCountChip.textContent = '0 keys'; ui.rawTimeChip.textContent = '—'; ui.mappedCountChip.textContent = '0 keys'; ui.mappedTimeChip.textContent = '—'; ui.hashLengthChip.textContent = '0 chars'; ui.hashTimeChip.textContent = '—'; ui.compressedSizeChip.textContent = '0 bytes'; ui.compressTimeChip.textContent = '—'; ui.encryptedSizeChip.textContent = '0 bytes'; ui.encryptTimeChip.textContent = '—';
-      collectorState.clear();
-      renderCollectorBadges();
+        capturedData = null;
+        ui.exportBtn.disabled = true;
+        ui.sessionChip.textContent = 'Idle';
+        ui.phaseChip.textContent = 'Waiting';
+        ui.currentCollectorChip.textContent = '—';
+        ui.elapsedChip.textContent = '0 ms';
+        ui.collectorChip.textContent = '0 / 0';
+        ui.progressFill.style.width = '0%';
+        ui.statusLine.innerHTML = 'Ready<span class="cursor"></span>';
+        ui.rawOutput.textContent = '{}';
+        ui.mappedOutput.textContent = '{}';
+        ui.hashOutput.textContent = '—';
+        ui.compressedOutput.textContent = '';
+        ui.encryptedOutput.textContent = '';
+        ui.rawCountChip.textContent = '0 keys';
+        ui.rawTimeChip.textContent = '—';
+        ui.mappedCountChip.textContent = '0 keys';
+        ui.mappedTimeChip.textContent = '—';
+        ui.hashLengthChip.textContent = '0 chars';
+        ui.hashTimeChip.textContent = '—';
+        ui.compressedSizeChip.textContent = '0 bytes';
+        ui.compressTimeChip.textContent = '—';
+        ui.encryptedSizeChip.textContent = '0 bytes';
+        ui.encryptTimeChip.textContent = '—';
+        collectorState.clear();
+        renderCollectorBadges();
     }
 
     async function runPipeline() {
-      const runId = ++activeRunId;
-      const start = performance.now();
-      ui.runBtn.disabled = true; ui.stopBtn.disabled = false; ui.sessionChip.textContent = 'Running'; ui.phaseChip.textContent = 'Collecting';
-      renderCollectorBadges();
-      try {
-        const featuresResult = await getFeatures({}, runId);
-        if (runId !== activeRunId) return;
-        const raw = featuresResult.data;
-        raw.fullFeatureCollection = featuresResult.full;
-        ui.rawOutput.textContent = safeSerialize(raw);
-        ui.rawCountChip.textContent = `${Object.keys(raw).length} keys`;
-        ui.rawTimeChip.textContent = formatMs(raw.latency.acq_time.allFeatures || 0);
+        const runId = ++activeRunId;
+        const start = performance.now();
+        ui.runBtn.disabled = true;
+        ui.stopBtn.disabled = false;
+        ui.sessionChip.textContent = 'Running';
+        ui.phaseChip.textContent = 'Collecting';
+        renderCollectorBadges();
+        try {
+            const featuresResult = await getFeatures({}, runId);
+            if (runId !== activeRunId)
+                return;
+            const raw = featuresResult.data;
+            raw.fullFeatureCollection = featuresResult.full;
+            ui.rawOutput.textContent = safeSerialize(raw);
+            ui.rawCountChip.textContent = `${Object.keys(raw).length} keys`;
+            ui.rawTimeChip.textContent = formatMs(raw.latency.acq_time.allFeatures || 0);
 
-        const mapStart = performance.now();
-        ui.phaseChip.textContent = 'Mapping';
-        const mapped = remapFeatures(raw);
-        ui.mappedOutput.textContent = safeSerialize(mapped);
-        ui.mappedCountChip.textContent = `${Object.keys(mapped).length} keys`;
-        ui.mappedTimeChip.textContent = formatMs(performance.now() - mapStart);
+            const mapStart = performance.now();
+            ui.phaseChip.textContent = 'Mapping';
+            const mapped = remapFeatures(raw);
+            ui.mappedOutput.textContent = safeSerialize(mapped);
+            ui.mappedCountChip.textContent = `${Object.keys(mapped).length} keys`;
+            ui.mappedTimeChip.textContent = formatMs(performance.now() - mapStart);
 
-        const hashStart = performance.now();
-        ui.phaseChip.textContent = 'Hashing';
-        const mappedJson = JSON.stringify(mapped);
-        const hash = x64hash128(mappedJson, 23);
-        ui.hashOutput.textContent = hash;
-        ui.hashLengthChip.textContent = `${hash.length} chars`;
-        ui.hashTimeChip.textContent = formatMs(performance.now() - hashStart);
+            const hashStart = performance.now();
+            ui.phaseChip.textContent = 'Hashing';
+            const mappedJson = JSON.stringify(mapped);
+            const hash = x64hash128(mappedJson, 23);
+            ui.hashOutput.textContent = hash;
+            ui.hashLengthChip.textContent = `${hash.length} chars`;
+            ui.hashTimeChip.textContent = formatMs(performance.now() - hashStart);
 
-        const compressStart = performance.now();
-        ui.phaseChip.textContent = 'Compressing';
-        const compressed = LZ.compressToBase64(mappedJson);
-        globalThis.apfcDfH = compressed;
-        ui.compressedOutput.textContent = compressed;
-        ui.compressedSizeChip.textContent = `${compressed.length} bytes`;
-        ui.compressTimeChip.textContent = formatMs(performance.now() - compressStart);
+            const compressStart = performance.now();
+            ui.phaseChip.textContent = 'Compressing';
+            const compressed = LZ.compressToBase64(mappedJson);
+            globalThis.apfcDfH = compressed;
+            ui.compressedOutput.textContent = compressed;
+            ui.compressedSizeChip.textContent = `${compressed.length} bytes`;
+            ui.compressTimeChip.textContent = formatMs(performance.now() - compressStart);
 
-        const encryptStart = performance.now();
-        ui.phaseChip.textContent = 'Encrypting';
-        const encrypted = await encryptWithKeyIds(JSON.stringify(raw), 'apfcDfPK', 'apfcDfPKV', true);
-        globalThis.apfcDf = encrypted;
-        ui.encryptedOutput.textContent = safeSerialize(encrypted);
-        ui.encryptedSizeChip.textContent = `${JSON.stringify(encrypted).length} bytes`;
-        ui.encryptTimeChip.textContent = formatMs(performance.now() - encryptStart);
+            const encryptStart = performance.now();
+            ui.phaseChip.textContent = 'Encrypting';
+            const encrypted = await encryptWithKeyIds(JSON.stringify(raw), 'apfcDfPK', 'apfcDfPKV', true);
+            globalThis.apfcDf = encrypted;
+            ui.encryptedOutput.textContent = safeSerialize(encrypted);
+            ui.encryptedSizeChip.textContent = `${JSON.stringify(encrypted).length} bytes`;
+            ui.encryptTimeChip.textContent = formatMs(performance.now() - encryptStart);
 
-        ui.phaseChip.textContent = 'Complete';
-        ui.sessionChip.textContent = 'Done';
-        ui.elapsedChip.textContent = formatMs(performance.now() - start);
-        ui.progressFill.style.width = '100%';
-        ui.statusLine.innerHTML = 'Pipeline complete<span class="cursor"></span>';
-      } catch (error) {
-        ui.sessionChip.textContent = 'Error';
-        ui.phaseChip.textContent = 'Failed';
-        ui.statusLine.innerHTML = `${String(error)}<span class="cursor"></span>`;
-      } finally {
-        if (runId === activeRunId) { ui.runBtn.disabled = false; ui.stopBtn.disabled = true; }
-      }
+            // Store captured data for export
+            capturedData = {
+                raw: raw,
+                mapped: mapped,
+                mappedJson: mappedJson,
+                hash: hash,
+                compressed: compressed,
+                encrypted: encrypted,
+                timestamp: new Date().toISOString()
+            };
+            ui.exportBtn.disabled = false;
+
+            ui.phaseChip.textContent = 'Complete';
+            ui.sessionChip.textContent = 'Done';
+            ui.elapsedChip.textContent = formatMs(performance.now() - start);
+            ui.progressFill.style.width = '100%';
+            ui.statusLine.innerHTML = 'Pipeline complete<span class="cursor"></span>';
+        } catch (error) {
+            ui.sessionChip.textContent = 'Error';
+            ui.phaseChip.textContent = 'Failed';
+            ui.statusLine.innerHTML = `${String(error)}<span class="cursor"></span>`;
+        } finally {
+            if (runId === activeRunId) {
+                ui.runBtn.disabled = false;
+                ui.stopBtn.disabled = true;
+            }
+        }
     }
 
-    document.querySelectorAll('.btn-copy').forEach((btn) => btn.addEventListener('click', () => copyTarget(btn.dataset.target)));
-    ui.resetBtn.addEventListener('click', () => { activeRunId += 1; resetUi(); });
-    ui.stopBtn.addEventListener('click', () => { activeRunId += 1; ui.sessionChip.textContent = 'Stopped'; ui.phaseChip.textContent = 'Stopped'; ui.runBtn.disabled = false; ui.stopBtn.disabled = true; ui.statusLine.innerHTML = 'Pipeline interrupted<span class="cursor"></span>'; });
+    document.querySelectorAll('.btn-copy').forEach( (btn) => btn.addEventListener('click', () => copyTarget(btn.dataset.target)));
+    ui.resetBtn.addEventListener('click', () => {
+        activeRunId += 1;
+        resetUi();
+    }
+    );
+    ui.stopBtn.addEventListener('click', () => {
+        activeRunId += 1;
+        ui.sessionChip.textContent = 'Stopped';
+        ui.phaseChip.textContent = 'Stopped';
+        ui.runBtn.disabled = false;
+        ui.stopBtn.disabled = true;
+        ui.statusLine.innerHTML = 'Pipeline interrupted<span class="cursor"></span>';
+    }
+    );
     ui.runBtn.addEventListener('click', runPipeline);
+
+    // Export functionality
+    function exportAllData() {
+        if (!capturedData) return;
+        const exportObj = {
+            exportTime: new Date().toISOString(),
+            raw: capturedData.raw,
+            mapped: capturedData.mapped,
+            hash: capturedData.hash,
+            compressed: capturedData.compressed,
+            encrypted: capturedData.encrypted,
+            timeline: {
+                captureTime: capturedData.timestamp,
+                hash: capturedData.hash,
+                compressedLength: capturedData.compressed.length,
+                encryptedLength: JSON.stringify(capturedData.encrypted).length
+            }
+        };
+        const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `dna_fingerprint_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    ui.exportBtn.addEventListener('click', exportAllData);
+
     resetUi();
-  </script>
-</body>
-</html>
+</script>
+</body></html>
