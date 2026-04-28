@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" href="data:,">
 <title>PerimeterX (PX) SDK Protocol Simulator</title>
 <style>
@@ -13,6 +13,7 @@
     --font: 'Segoe UI', 'Microsoft YaHei', system-ui, monospace;
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.6; overflow-x: hidden; }
   header { padding: 2rem 1rem; text-align: center; border-bottom: 1px solid var(--border); background: linear-gradient(90deg, #161b22 0%, #0d1117 100%); }
   h1 { margin: 0; font-size: 1.6rem; color: var(--accent); }
@@ -42,10 +43,41 @@
   .btn:hover { background: var(--accent); color: #000; }
   .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
   .table-wrap { overflow-x: auto; }
+  .mobile-bottom-nav, .mobile-field-cards, .toast { display: none; }
   .muted { color: var(--text-secondary); }
   .ok { color: #7ee787; }
   .warn { color: #f2cc60; }
   @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) {
+    body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+    header { padding: calc(.9rem + env(safe-area-inset-top)) .9rem .9rem; text-align: left; position: sticky; top: 0; z-index: 10; background: rgba(13,17,23,.94); backdrop-filter: blur(14px); }
+    h1 { font-size: 1.35rem; line-height: 1.25; }
+    header p { margin: .55rem 0 0; font-size: .92rem; line-height: 1.45; }
+    h2 { margin: 1rem 0 .65rem; font-size: 1rem; scroll-margin-top: 112px; }
+    .container { padding: .8rem; }
+    .grid { grid-template-columns: 1fr; gap: .75rem; }
+    .card { border-radius: 14px; padding: .9rem; }
+    .card:hover { transform: none; box-shadow: none; }
+    .card h3 { font-size: .98rem; line-height: 1.35; }
+    .copy-btn { float: none; min-height: 40px; margin-bottom: .5rem; padding: .45rem .75rem; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; }
+    .btn { min-height: 46px; padding: .55rem .7rem; }
+    pre { max-height: 260px; overflow: auto; font-size: .78rem; white-space: pre-wrap; word-break: break-word; -webkit-overflow-scrolling: touch; }
+    table { font-size: .8rem; }
+    th, td { padding: .38rem .45rem; }
+    .table-wrap { -webkit-overflow-scrolling: touch; }
+    #field-map-table-wrap { display: none; }
+    .mobile-field-cards { display: grid; gap: .65rem; }
+    .field-card { border: 1px solid var(--border); background: #0d1117; border-radius: 12px; padding: .75rem; }
+    .field-card-key { color: var(--warn); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .78rem; word-break: break-all; }
+    .field-card-title { margin-top: .35rem; color: var(--accent); font-weight: 700; }
+    .field-card-meta, .field-card-value { margin-top: .3rem; color: var(--text-secondary); font-size: .78rem; word-break: break-word; }
+    .toast { position: fixed; left: .8rem; right: .8rem; bottom: calc(74px + env(safe-area-inset-bottom)); z-index: 30; padding: .75rem .9rem; border: 1px solid var(--border); border-radius: 12px; background: #1c2128; color: var(--text); box-shadow: 0 12px 28px rgba(0,0,0,.35); text-align: center; }
+    .toast.show { display: block; }
+    .mobile-bottom-nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: .35rem; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: .45rem .5rem calc(.45rem + env(safe-area-inset-bottom)); background: rgba(13,17,23,.96); border-top: 1px solid var(--border); backdrop-filter: blur(14px); }
+    .mobile-bottom-nav button { min-height: 44px; border: 1px solid var(--border); border-radius: 10px; background: #161b22; color: var(--text); font-size: .72rem; font-weight: 700; }
+    .mobile-bottom-nav button:active { background: var(--accent); color: #000; }
+  }
 </style>
 </head>
 <body>
@@ -64,7 +96,7 @@
     </div>
   </div>
 
-  <h2>1. URL 参数组装</h2>
+  <h2 id="section-url">1. URL 参数组装</h2>
   <div class="card">
     <button class="copy-btn" onclick="copy('url-params')">复制</button>
     <h3>外层信封参数映射</h3>
@@ -75,10 +107,10 @@
     <pre id="url-params"></pre>
   </div>
 
-  <h2>2. 实时采集 - 浏览器指纹</h2>
+  <h2 id="section-fingerprint">2. 实时采集 - 浏览器指纹</h2>
   <div class="grid" id="fingerprint-grid"></div>
 
-  <h2>3. 字段语义映射</h2>
+  <h2 id="section-fields">3. 字段语义映射</h2>
   <div class="card">
     <h3><span class="badge">Dict</span> 公共字段与发送时字段</h3>
     <table>
@@ -87,17 +119,17 @@
     </table>
   </div>
 
-  <h2>4. 加密管道模拟</h2>
+  <h2 id="section-pipeline">4. 加密管道模拟</h2>
   <div class="card">
     <h3><span class="badge">Pipe</span> vH() -> hN() -> jl(..., iH=50) -> hE() -> vD() -> vF() -> vI()</h3>
     <div class="pipeline" id="pipeline"></div>
     <pre id="pipeline-code"></pre>
   </div>
 
-  <h2>5. 活动类型与队列</h2>
+  <h2 id="section-activity">5. 活动类型与队列</h2>
   <div class="grid" id="activity-grid"></div>
 
-  <h2>6. 一比一函数链模拟</h2>
+  <h2 id="section-chain">6. 一比一函数链模拟</h2>
   <div class="card">
     <h3><span class="badge">Call Chain</span> uX() -> FA_kE() -> ys() -> vH()</h3>
     <div class="actions">
@@ -128,7 +160,8 @@
     </div>
     <div class="card wide">
       <h3><span class="badge">Map</span> 字段一比一对照表</h3>
-      <div class="table-wrap"><table><thead><tr><th>活动</th><th>混淆字段</th><th>可读字段</th><th>值</th><th>源码</th><th>状态</th></tr></thead><tbody id="field-map-tbody"></tbody></table></div>
+      <div class="table-wrap" id="field-map-table-wrap"><table><thead><tr><th>活动</th><th>混淆字段</th><th>可读字段</th><th>值</th><th>源码</th><th>状态</th></tr></thead><tbody id="field-map-tbody"></tbody></table></div>
+      <div class="mobile-field-cards" id="field-map-cards"></div>
     </div>
     <div class="card wide">
       <h3><span class="badge">Coverage</span> 字段覆盖率</h3>
@@ -138,26 +171,54 @@
     <pre id="final-body"></pre>
   </div>
 
-  <h2>7. 请求配置 & 容错链</h2>
+  <h2 id="section-xhr">7. 请求配置 & 容错链</h2>
   <div class="card">
     <h3><span class="badge">XHR</span> 请求头与回退策略</h3>
     <div id="xhr-kv"></div>
   </div>
 
-  <h2>8. 原始代码关键行号索引</h2>
+  <h2 id="section-source">8. 原始代码关键行号索引</h2>
   <div class="card">
     <button class="copy-btn" onclick="copy('src-index')">复制</button>
     <pre id="src-index"></pre>
   </div>
 </div>
 
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<nav class="mobile-bottom-nav" aria-label="移动端快速导航">
+  <button type="button" onclick="scrollToSection('section-url')">参数</button>
+  <button type="button" onclick="scrollToSection('section-fingerprint')">指纹</button>
+  <button type="button" onclick="scrollToSection('section-chain')">JSON</button>
+  <button type="button" onclick="scrollToSection('field-map-cards')">字段</button>
+  <button type="button" onclick="scrollToSection('section-source')">源码</button>
+</nav>
+
 <script>
 const $ = id => document.getElementById(id);
+
+let toastTimer = null;
+
+function showToast(message) {
+  const toast = $('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function hideToast() {
+    toast.classList.remove('show');
+  }, 1800);
+}
+
+function scrollToSection(id) {
+  const target = $(id);
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 function copy(id) {
   const value = $(id).textContent;
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(value).then(() => alert('已复制')).catch(() => fallbackCopy(value));
+    navigator.clipboard.writeText(value).then(() => showToast('已复制')).catch(() => fallbackCopy(value));
   } else {
     fallbackCopy(value);
   }
@@ -170,7 +231,7 @@ function fallbackCopy(value) {
   area.select();
   document.execCommand('copy');
   document.body.removeChild(area);
-  alert('已复制');
+  showToast('已复制');
 }
 
 const APP_ID = "PXdOjV695v";
@@ -923,6 +984,16 @@ function renderFieldMappings() {
     return `<tr><td>${row.activityType}<br><span class="muted">${row.readableActivityType}</span></td><td>${row.obfuscatedKey}</td><td>${row.readableKey}</td><td>${safeString(row.valuePreview)}</td><td>${row.sourceFunction}<br><span class="muted">行 ${row.sourceLine}</span></td><td>${row.status}</td></tr>`;
   });
   $("field-map-tbody").innerHTML = rows.join("");
+  var cards = fieldMappings.map(function mapFieldCard(row) {
+    return `<article class="field-card">
+      <div class="field-card-key">${row.obfuscatedKey}</div>
+      <div class="field-card-title">${row.readableKey}</div>
+      <div class="field-card-meta">${row.activityType} / ${row.readableActivityType}</div>
+      <div class="field-card-value">值: ${safeString(row.valuePreview)}</div>
+      <div class="field-card-meta">源码: ${row.sourceFunction} 行 ${row.sourceLine} · ${row.status}</div>
+    </article>`;
+  });
+  $("field-map-cards").innerHTML = cards.join("");
 }
 
 function renderCoverage() {
