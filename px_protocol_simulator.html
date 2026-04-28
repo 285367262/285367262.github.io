@@ -41,6 +41,7 @@
   .btn { background: #21262d; border: 1px solid var(--border); color: var(--text); padding: .45rem .75rem; border-radius: 6px; cursor: pointer; }
   .btn:hover { background: var(--accent); color: #000; }
   .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+  .table-wrap { overflow-x: auto; }
   .muted { color: var(--text-secondary); }
   .ok { color: #7ee787; }
   .warn { color: #f2cc60; }
@@ -102,7 +103,8 @@
     <div class="actions">
       <button class="btn" onclick="runProtocolSimulation()">重新生成模拟请求</button>
       <button class="btn" onclick="copy('final-body')">复制 POST Body</button>
-      <button class="btn" onclick="copy('activity-json')">复制活动 JSON</button>
+      <button class="btn" onclick="copy('obfuscated-activity-json')">复制混淆 JSON</button>
+      <button class="btn" onclick="copy('readable-activity-json')">复制可读 JSON</button>
     </div>
     <div class="two-col">
       <div>
@@ -110,9 +112,27 @@
         <pre id="queue-state"></pre>
       </div>
       <div>
-        <h3>活动 JSON</h3>
+        <h3>兼容活动 JSON</h3>
         <pre id="activity-json"></pre>
       </div>
+    </div>
+    <div class="grid">
+      <div class="card wide">
+        <h3><span class="badge">Obfuscated</span> 原始混淆活动 JSON</h3>
+        <pre id="obfuscated-activity-json"></pre>
+      </div>
+      <div class="card wide">
+        <h3><span class="badge">Readable</span> 可读字段活动 JSON</h3>
+        <pre id="readable-activity-json"></pre>
+      </div>
+    </div>
+    <div class="card wide">
+      <h3><span class="badge">Map</span> 字段一比一对照表</h3>
+      <div class="table-wrap"><table><thead><tr><th>活动</th><th>混淆字段</th><th>可读字段</th><th>值</th><th>源码</th><th>状态</th></tr></thead><tbody id="field-map-tbody"></tbody></table></div>
+    </div>
+    <div class="card wide">
+      <h3><span class="badge">Coverage</span> 字段覆盖率</h3>
+      <pre id="field-coverage"></pre>
     </div>
     <h3>最终 POST Body</h3>
     <pre id="final-body"></pre>
@@ -161,6 +181,9 @@ let Es = 0;
 let uS = 0;
 const pageInitTs = Date.now();
 const activityStartTs = Date.now();
+let readableActivities = [];
+let fieldMappings = [];
+let currentReadableActivity = null;
 
 function safeString(value) {
   if (value === undefined) return "undefined";
@@ -304,6 +327,614 @@ function collectFingerprint() {
   return fp;
 }
 
+const FIELD_DEFINITIONS = [
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "BFE1GkEzMyg=", readableKey: "browserFlag", sourceFunction: "AA()", sourceLine: 7520, collectorGroup: "browserRuntime", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "NSAEa3BCAlg=", readableKey: "browserConfig", sourceFunction: "AB()", sourceLine: 7525, collectorGroup: "browserRuntime", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "GmsrYF8JLVc=", readableKey: "numericConstant", sourceFunction: "AF()", sourceLine: 7544, collectorGroup: "browserRuntime", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "BzZ2fUJUcEY=", readableKey: "stringConstant", sourceFunction: "AJ()", sourceLine: 7560, collectorGroup: "browserRuntime", status: "fallback" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "HUhsQ1guanY=", readableKey: "privateMode", sourceFunction: "AM()", sourceLine: 7580, collectorGroup: "privacy", status: "fallback" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "WQQoDx9pJjk=", readableKey: "currentUrl", sourceFunction: "AM()", sourceLine: 7594, collectorGroup: "location", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "ZRBUGyB0UCo=", readableKey: "referrerEncoded", sourceFunction: "AM()", sourceLine: 7597, collectorGroup: "location", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "WGVpbh4CbFs=", readableKey: "orientationChangeSupport", sourceFunction: "AM()", sourceLine: 7598, collectorGroup: "browserRuntime", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "JDFVOmFWUAg=", readableKey: "timezoneOffset", sourceFunction: "AN()", sourceLine: 7604, collectorGroup: "time", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "EXxgN1ceZgw=", readableKey: "chromeObjectDetection", sourceFunction: "AN()", sourceLine: 7604, collectorGroup: "browserRuntime", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "AzJyeUVRcE0=", readableKey: "visitorIdHash", sourceFunction: "AO()", sourceLine: 7611, collectorGroup: "identity", status: "fallback" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "WGVpbh4CaF0=", readableKey: "sessionRecoveryHash", sourceFunction: "AO()", sourceLine: 7611, collectorGroup: "identity", status: "fallback" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "bHkdcikbEkI=", readableKey: "configParameter", sourceFunction: "AO()", sourceLine: 7611, collectorGroup: "config", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "LVgcU2g4GGc=", readableKey: "audioWorkletSupport", sourceFunction: "AP()", sourceLine: 7658, collectorGroup: "audio", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "HCktIllIKRQ=", readableKey: "audioDetectionResult", sourceFunction: "AP()", sourceLine: 7663, collectorGroup: "audio", status: "fallback" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "UB1hVhZ8ZmE=", readableKey: "nightmareDetected", sourceFunction: "AQ()", sourceLine: 397, collectorGroup: "automation", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "aRRYHyxzWi0=", readableKey: "phantomDetected", sourceFunction: "AQ()", sourceLine: 398, collectorGroup: "automation", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "JndXfGAXV04=", readableKey: "callPhantomDetected", sourceFunction: "AQ()", sourceLine: 399, collectorGroup: "automation", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "bj8fNChTHQU=", readableKey: "screenWidth", sourceFunction: "AR()", sourceLine: 375, collectorGroup: "screen", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "WQQoDxxhLDw=", readableKey: "screenAvailWidth", sourceFunction: "AR()", sourceLine: 376, collectorGroup: "screen", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "FmcnbFMDIV0=", readableKey: "screenColorDepth", sourceFunction: "AR()", sourceLine: 377, collectorGroup: "screen", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "M2ICKXYCBRo=", readableKey: "windowInnerHeight", sourceFunction: "AR()", sourceLine: 380, collectorGroup: "screen", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "OSQIb3xBCls=", readableKey: "pluginCount", sourceFunction: "AV()", sourceLine: 382, collectorGroup: "navigator", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "JDFVOmJQWws=", readableKey: "navigatorLanguage", sourceFunction: "AV()", sourceLine: 383, collectorGroup: "navigator", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "Czp6cU1YfkI=", readableKey: "deviceMemory", sourceFunction: "AV()", sourceLine: 384, collectorGroup: "navigator", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "aHUZfi4XF0g=", readableKey: "sendBeaconSupport", sourceFunction: "AT()", sourceLine: 389, collectorGroup: "browserRuntime", status: "implemented" },
+  { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "W0oqQR0oK3s=", readableKey: "webdriverDetected", sourceFunction: "AT()", sourceLine: 391, collectorGroup: "automation", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "cRxAFzR5Ri0=", readableKey: "x", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "M2ICKXYCBR8=", readableKey: "y", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "WQQoDx9pJjk=", readableKey: "currentUrl", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "QSwwZwRLNlY=", readableKey: "eventType", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "FmcnbFAFKFc=", readableKey: "eventTimestamp", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "JDFVOmJcWw8=", readableKey: "touchDetails", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "fallback" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "fWhMIzgITBA=", readableKey: "targetElement", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "HUhsQ1sqb3M=", readableKey: "interactionData", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "fallback" },
+  { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "aRRYHy95Xy4=", readableKey: "behaviorEnabled", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
+  { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "eypKYT1HTFM=", readableKey: "behaviorInterval", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
+  { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "OSQIb3xBC1Q=", readableKey: "behaviorSendCount", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
+  { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "MVwAV3c/A2E=", readableKey: "userAgent", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
+  { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "MVwAV3Q6A2M=", readableKey: "behaviorEventCount", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
+  { activityType: "dyZGbTJCSVo=", readableActivityType: "unloadBeacon", obfuscatedKey: "cgMDSDdlA34=", readableKey: "stateValue", sourceFunction: "sP()", sourceLine: 4789, collectorGroup: "unload", status: "fallback" },
+  { activityType: "YQxQByRsVzw=", readableActivityType: "corsFailure", obfuscatedKey: "TTg8cwtbPUA=", readableKey: "failedUrl", sourceFunction: "yA()", sourceLine: 6193, collectorGroup: "cors", status: "fallback" }
+];
+
+function addFieldDefinitions(definitions) {
+  definitions.forEach(function addDefinition(definition) {
+    FIELD_DEFINITIONS.push(definition);
+  });
+}
+
+function defineMainField(obfuscatedKey, readableKey, sourceFunction, sourceLine, collectorGroup, status) {
+  return { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: obfuscatedKey, readableKey: readableKey, sourceFunction: sourceFunction, sourceLine: sourceLine, collectorGroup: collectorGroup, status: status || "implemented" };
+}
+
+function defineActivityField(activityType, readableActivityType, obfuscatedKey, readableKey, sourceFunction, sourceLine, collectorGroup, status) {
+  return { activityType: activityType, readableActivityType: readableActivityType, obfuscatedKey: obfuscatedKey, readableKey: readableKey, sourceFunction: sourceFunction, sourceLine: sourceLine, collectorGroup: collectorGroup, status: status || "implemented" };
+}
+
+addFieldDefinitions([
+  defineMainField("Hm8vZFgPLlE=", "audioRenderSum", "yD()", 6400, "audio", "browser-limited"),
+  defineMainField("Ln9fdGsaWU8=", "audioRenderHash", "yD()", 6400, "audio", "browser-limited"),
+  defineMainField("GmsrYFwMKFA=", "webglCanvasHash", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("InNTeGcVXEg=", "webglVendor", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("YG0RZiYMFFI=", "webglErrors", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("STQ4fwxVPk4=", "webglExtensionsHash", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("aRRYHyxxWiQ=", "webglParameters", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("W0oqQR4rLHE=", "webglParametersHash", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("YG0RZiYNElE=", "webglUnmaskedRenderer", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("X04uRRkvK3M=", "webglShadingLanguageVersion", "yJ()/yM()", 6431, "webgl", "implemented"),
+  defineMainField("VQAkCxNtID4=", "canvasEmojiHash", "yK()", 6456, "canvas", "implemented"),
+  defineMainField("IUwQR2QtEXc=", "canvasUnicodeHash", "yL()", 6481, "canvas", "implemented"),
+  defineMainField("KxoaEW15FSI=", "webRtcSupport", "AP()", 7659, "browserRuntime", "implemented"),
+  defineMainField("BFE1GkExOy4=", "touchPointSupport", "AP()", 7665, "browserRuntime", "implemented"),
+  defineMainField("Bhc3XENxNWc=", "navigatorPrototypeDescriptor", "AP()", 7718, "navigator", "fallback"),
+  defineMainField("Y1JSWSU1VGg=", "emitSupport", "AQ()", 7732, "automation", "implemented"),
+  defineMainField("WGVpbh0Ab14=", "documentAutomationFlag", "AQ()", 7732, "automation", "implemented"),
+  defineMainField("XGltYhoOY1A=", "screenPixelDepth", "AR()", 7745, "screen", "implemented"),
+  defineMainField("PAlNQnlrQ3Y=", "windowScreenX", "AR()", 7748, "screen", "implemented"),
+  defineMainField("dgcHTDNnBXk=", "windowScrollY", "AR()", 7748, "screen", "implemented"),
+  defineMainField("O2oKIX0LDho=", "usedJSHeapSize", "AT()", 7774, "performance", "browser-limited"),
+  defineMainField("RTA0ewNRN0w=", "jsHeapSizeLimit", "AT()", 7774, "performance", "browser-limited"),
+  defineMainField("JVAUW2MxFG0=", "devicePixelRatio", "AT()", 7778, "screen", "implemented"),
+  defineMainField("cyJCaTZGTFs=", "automationSignal", "AT()", 7782, "automation", "implemented"),
+  defineMainField("dEEFCjImBzE=", "iframeElementSupport", "AT()", 7784, "browserRuntime", "implemented"),
+  defineMainField("eWRILzwDRxo=", "showModalDialogSupport", "AT()", 7785, "browserRuntime", "implemented"),
+  defineMainField("KxoaEW19FCQ=", "documentMode", "AT()/IJ()", 7786, "browserRuntime", "implemented"),
+  defineMainField("RBF1WgF2c2w=", "postMessageNative", "AT()", 7788, "browserRuntime", "implemented"),
+  defineMainField("JndXfGAVVE8=", "windowOuterHeight", "AT()", 7789, "screen", "implemented"),
+  defineMainField("S3o6MQ4cOQc=", "setTimeoutNative", "AT()", 7791, "browserRuntime", "implemented"),
+  defineMainField("YQxQByRuVzY=", "scriptNonce", "AT()", 7797, "browserRuntime", "fallback"),
+  defineMainField("bHkdcikYH0c=", "chromeRuntimeErrorFlag", "AT()", 7800, "automation", "fallback"),
+  defineMainField("W0oqQR4uKXA=", "functionBindNative", "AT()", 7803, "browserRuntime", "implemented"),
+  defineMainField("OktLAHwrTTQ=", "setIntervalNative", "AT()", 7807, "browserRuntime", "implemented"),
+  defineMainField("dyZGbTJGRFY=", "getComputedStyleNative", "AT()", 7808, "browserRuntime", "implemented"),
+  defineMainField("OSQIb3xCBls=", "pluginsLength", "AV()", 7854, "navigator", "implemented"),
+  defineMainField("UiNjKBdEZBI=", "pluginMutationCheck", "AV()", 7854, "navigator", "implemented"),
+  defineMainField("DXh8M0sZfQc=", "pluginMutationMirror", "AV()", 7854, "navigator", "implemented"),
+  defineMainField("JVAUW2M3Gm0=", "pluginEnabledPluginCheck", "AV()", 7856, "navigator", "browser-limited"),
+  defineMainField("Y1JSWSU+XG0=", "pluginItemOverflowCheck", "AV()", 7859, "navigator", "browser-limited"),
+  defineMainField("DFk9Ekk8MiI=", "geolocationMissing", "AV()", 7865, "navigator", "implemented"),
+  defineMainField("fy5OZTpKQFY=", "navigatorProduct", "AV()", 7865, "navigator", "implemented"),
+  defineMainField("NSAEa3NABF0=", "mimeTypesToString", "AV()/Bj()", 7865, "navigator", "implemented"),
+  defineMainField("eWRILz8ITBQ=", "mimeTypesToStringMirror", "AV()/Bj()", 7865, "navigator", "implemented"),
+  defineMainField("Slt7EAw4dCo=", "navigatorVendor", "AV()", 7871, "navigator", "implemented"),
+  defineMainField("M2ICKXUAAx8=", "permissionQueryNativeName", "AV()", 7877, "permissions", "implemented"),
+  defineMainField("Dh8/VEh4PmQ=", "connectionDownlink", "AV()", 7880, "network", "browser-limited"),
+  defineMainField("JxYWHWF0GCw=", "connectionType", "AV()", 7880, "network", "browser-limited"),
+  defineMainField("OktLAHwqSzM=", "connectionEffectiveType", "AV()", 7880, "network", "browser-limited"),
+  defineMainField("cH0BdjYRAEM=", "navigatorOnline", "AV()", 7883, "navigator", "implemented"),
+  defineMainField("FmcnbFMCIV4=", "geolocationObjectString", "AV()", 7883, "navigator", "implemented"),
+  defineMainField("bRhcEyh6XCA=", "javaEnabled", "AV()", 7883, "navigator", "implemented"),
+  defineMainField("LDldMmlZXAc=", "cookieEnabled", "AV()", 7883, "navigator", "implemented"),
+  defineMainField("P24OJXoPCBE=", "uaArchitecture", "AV()", 7885, "userAgentData", "browser-limited"),
+  defineMainField("QSwwZwRNNlI=", "uaBitness", "AV()", 7885, "userAgentData", "browser-limited"),
+  defineMainField("b15eVSo/WG4=", "uaMobile", "AV()", 7885, "userAgentData", "browser-limited"),
+  defineMainField("TTg8cwhZO0A=", "uaPlatform", "AV()", 7885, "userAgentData", "browser-limited"),
+  defineMainField("fEkNAjkoCjI=", "uaPlatformVersion", "AV()", 7885, "userAgentData", "browser-limited"),
+  defineMainField("P24OJXoPCRQ=", "uaFullVersion", "AV()", 7885, "userAgentData", "browser-limited"),
+  defineMainField("Z1ZWXSI3VGY=", "pdfViewerEnabled", "AV()", 7887, "navigator", "implemented"),
+  defineMainField("fWhMIzgKQhk=", "bluetoothSupport", "AV()", 7887, "navigator", "implemented"),
+  defineActivityField("JDFVOmFVUAg=", "clickVisual", "T34+NQoZOAI=", "centerX", "Dv()", 9284, "interaction", "implemented"),
+  defineActivityField("JDFVOmFVUAg=", "clickVisual", "OSQIb39DD1w=", "centerY", "Dv()", 9284, "interaction", "implemented"),
+  defineActivityField("JDFVOmFVUAg=", "clickVisual", "BFE1GkIxMS8=", "elementWidth", "Dv()", 9284, "interaction", "implemented"),
+  defineActivityField("JDFVOmFVUAg=", "clickVisual", "dWBEKzAGQhE=", "elementLeft", "Dv()", 9284, "interaction", "implemented"),
+  defineActivityField("JDFVOmFVUAg=", "clickVisual", "GURoT18obHk=", "offsetWidth", "Dv()", 9284, "interaction", "implemented"),
+  defineActivityField("JDFVOmFVUAg=", "clickVisual", "JVAUW2MyEWg=", "offsetHeight", "Dv()", 9284, "interaction", "implemented"),
+  defineActivityField("JDFVOmFVUAg=", "clickVisual", "VidnLBNCYxc=", "visualClickCount", "Dv()", 9284, "interaction", "implemented"),
+  defineActivityField("FwZmDVFrZT4=", "domHook", "egsLQD9tD3o=", "hookedStackList", "Do()", 9246, "dom", "fallback"),
+  defineActivityField("ZRBUGyByWik=", "cspIframe", "LDldMmlaWgk=", "iframeCreateTs", "Gx()", 10350, "csp", "fallback"),
+  defineActivityField("ZRBUGyByWik=", "cspIframe", "GURoT18kbXw=", "iframeReportTs", "Gx()", 10356, "csp", "fallback"),
+  defineActivityField("O2oKIX4KCho=", "automationSignals", "WGVpbh0Ga1Q=", "automationPayload", "EF()/EH()", 9657, "automation", "fallback"),
+  defineActivityField("dyZGbTJCSVo=", "unloadBeacon", "Q3IyOQYSMQM=", "documentVisibility", "IJ()", 11005, "unload", "implemented"),
+  defineActivityField("dyZGbTJCSVo=", "unloadBeacon", "KxoaEW19FCQ=", "documentMode", "IJ()", 11005, "unload", "implemented"),
+  defineActivityField("dyZGbTJCSVo=", "unloadBeacon", "IxISGWV+HSM=", "unloadTiming", "IJ()", 11005, "unload", "fallback")
+]);
+
+function getFieldDefinition(activityType, readableKey) {
+  return FIELD_DEFINITIONS.find(function findDefinition(definition) {
+    return definition.activityType === activityType && definition.readableKey === readableKey;
+  });
+}
+
+function previewValue(value) {
+  var text = safeString(value);
+  return text.length > 120 ? text.slice(0, 117) + "..." : text;
+}
+
+function setField(targets, definition, value, statusOverride) {
+  if (!definition) return;
+  targets.obfuscated.d[definition.obfuscatedKey] = value;
+  targets.readable.fields[definition.readableKey] = value;
+  fieldMappings.push({
+    activityType: definition.activityType,
+    readableActivityType: definition.readableActivityType,
+    obfuscatedKey: definition.obfuscatedKey,
+    readableKey: definition.readableKey,
+    valuePreview: previewValue(value),
+    sourceFunction: definition.sourceFunction,
+    sourceLine: definition.sourceLine,
+    collectorGroup: definition.collectorGroup,
+    status: statusOverride || definition.status
+  });
+}
+
+function safeCollect(label, collector, fallback, statusOnFailure) {
+  try { return { value: collector(), status: null }; }
+  catch (error) { return { value: fallback, status: statusOnFailure || "fallback", error: label + ":" + error.message }; }
+}
+
+function hashString(value) {
+  var text = String(value || "");
+  var hash = 0x811c9dc5;
+  for (var index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return ("00000000" + hash.toString(16)).slice(-8);
+}
+
+function isNative(fn) {
+  return typeof fn === "function" && /\[native code\]/.test(Function.prototype.toString.call(fn));
+}
+
+function createCanvas(width, height) {
+  var canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.display = "inline";
+  return canvas;
+}
+
+function collectCanvasEmojiFingerprint() {
+  try {
+    var canvas = createCanvas(650, 12);
+    var context = canvas.getContext("2d");
+    if (!context || typeof context.fillText !== "function") return "M2ICKXUPDBk=";
+    context.font = "6px Arial";
+    for (var glyph = 1, codepoint = 128512; codepoint < 128591; codepoint++, glyph++) {
+      context.fillText(String.fromCodePoint(codepoint), 8 * glyph, 8);
+    }
+    return hashString(canvas.toDataURL());
+  } catch (error) {
+    return "IUwQR2csEXE=";
+  }
+}
+
+function collectCanvasUnicodeFingerprint() {
+  try {
+    var canvas = createCanvas(860, 6);
+    var context = canvas.getContext("2d");
+    if (!context || typeof context.fillText !== "function") return "M2ICKXUPDBk=";
+    context.font = "6px sans-serif";
+    var glyph = 1;
+    [97, 667, 917, 1050, 1344, 1488, 1575, 1808, 1931, 2342, 2476, 2583, 2711, 2825, 2980, 3108, 3221, 3374, 3517, 3524, 3652, 3749, 3926, 4121, 4325, 4877, 5091, 5123, 6017, 6190, 6682, 7070, 11612, 20206, 27721, 41352, 43415, 54620, 55295].forEach(function drawCodepoint(codepoint) {
+      context.fillText(String.fromCodePoint(codepoint), 6 * glyph, 6);
+      glyph++;
+    });
+    for (var codepoint = 9881; codepoint < 9983; codepoint++, glyph++) {
+      context.fillText(String.fromCodePoint(codepoint), 6 * glyph, 6);
+    }
+    return hashString(canvas.toDataURL());
+  } catch (error) {
+    return "IUwQR2csEXE=";
+  }
+}
+
+function webglParam(gl, key) {
+  try { return gl.getParameter(key); }
+  catch (error) { return "PX_ERROR"; }
+}
+
+function collectWebglFingerprint() {
+  var fallback = {
+    webglCanvasHash: "PX_UNAVAILABLE",
+    webglVendor: "PX_UNAVAILABLE",
+    webglErrors: [],
+    webglExtensionsHash: "PX_UNAVAILABLE",
+    webglParameters: ["PX_UNAVAILABLE"],
+    webglParametersHash: "PX_UNAVAILABLE",
+    webglUnmaskedRenderer: "PX_UNAVAILABLE",
+    webglShadingLanguageVersion: "PX_UNAVAILABLE"
+  };
+  try {
+    var canvas = createCanvas(2000, 200);
+    var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) return fallback;
+    var errors = [];
+    try {
+      var buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.2, -0.9, 0, 0.4, -0.26, 0, 0, 0.732134444, 0]), gl.STATIC_DRAW);
+      var program = gl.createProgram();
+      var vertex = gl.createShader(gl.VERTEX_SHADER);
+      var fragment = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(vertex, "attribute vec2 attrVertex;varying vec2 varyinTexCoordinate;uniform vec2 uniformOffset;void main(){varyinTexCoordinate=attrVertex+uniformOffset;gl_Position=vec4(attrVertex,0,1);}");
+      gl.shaderSource(fragment, "precision mediump float;varying vec2 varyinTexCoordinate;void main() {gl_FragColor=vec4(varyinTexCoordinate,0,1);}");
+      gl.compileShader(vertex);
+      gl.compileShader(fragment);
+      gl.attachShader(program, vertex);
+      gl.attachShader(program, fragment);
+      gl.linkProgram(program);
+      gl.useProgram(program);
+      var attr = gl.getAttribLocation(program, "attrVertex");
+      var offset = gl.getUniformLocation(program, "uniformOffset");
+      gl.enableVertexAttribArray(attr);
+      gl.vertexAttribPointer(attr, 3, gl.FLOAT, false, 0, 0);
+      gl.uniform2f(offset, 1, 1);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+    } catch (error) {
+      errors.push("M2ICKXUPDBk=");
+    }
+    var extensions = gl.getSupportedExtensions() || [];
+    var debug = gl.getExtension("WEBGL_debug_renderer_info");
+    var params = [
+      webglParam(gl, gl.ALIASED_LINE_WIDTH_RANGE),
+      webglParam(gl, gl.ALIASED_POINT_SIZE_RANGE),
+      webglParam(gl, gl.ALPHA_BITS),
+      gl.getContextAttributes() && gl.getContextAttributes().antialias ? "yes" : "no",
+      webglParam(gl, gl.BLUE_BITS),
+      webglParam(gl, gl.DEPTH_BITS),
+      webglParam(gl, gl.MAX_TEXTURE_SIZE),
+      webglParam(gl, gl.MAX_VIEWPORT_DIMS),
+      webglParam(gl, gl.STENCIL_BITS)
+    ];
+    return {
+      webglCanvasHash: hashString(canvas.toDataURL()),
+      webglVendor: webglParam(gl, gl.VENDOR),
+      webglErrors: errors,
+      webglExtensionsHash: hashString(extensions.join(",")),
+      webglParameters: params,
+      webglParametersHash: hashString(hN(params)),
+      webglUnmaskedRenderer: debug ? webglParam(gl, debug.UNMASKED_RENDERER_WEBGL) : "PX_UNAVAILABLE",
+      webglShadingLanguageVersion: webglParam(gl, gl.SHADING_LANGUAGE_VERSION)
+    };
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function collectAudioFingerprint() {
+  return new Promise(function resolveAudio(resolve) {
+    try {
+      var AudioContextCtor = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!AudioContextCtor) return resolve({ audioRenderSum: "PX_UNAVAILABLE", audioRenderHash: "PX_UNAVAILABLE", status: "browser-limited" });
+      var context = new AudioContextCtor(1, 44100, 44100);
+      var oscillator = context.createOscillator();
+      var compressor = context.createDynamicsCompressor();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(10000, context.currentTime || 0);
+      compressor.threshold.setValueAtTime(-50, context.currentTime || 0);
+      compressor.knee.setValueAtTime(40, context.currentTime || 0);
+      compressor.ratio.setValueAtTime(12, context.currentTime || 0);
+      compressor.attack.setValueAtTime(0, context.currentTime || 0);
+      compressor.release.setValueAtTime(0.25, context.currentTime || 0);
+      oscillator.connect(compressor);
+      compressor.connect(context.destination);
+      oscillator.start(0);
+      context.startRendering().then(function rendered(buffer) {
+        var sum = 0;
+        var channel = buffer.getChannelData(0);
+        for (var index = 4500; index < 5000; index++) sum += Math.abs(channel[index] || 0);
+        var text = String(sum);
+        resolve({ audioRenderSum: text, audioRenderHash: hashString(text), status: "implemented" });
+      }).catch(function onError() {
+        resolve({ audioRenderSum: "PX_ERROR", audioRenderHash: "PX_ERROR", status: "browser-limited" });
+      });
+    } catch (error) {
+      resolve({ audioRenderSum: "PX_ERROR", audioRenderHash: "PX_ERROR", status: "browser-limited" });
+    }
+  });
+}
+
+function createActivityTargets(activityType, readableActivityType) {
+  var ts = Date.now();
+  currentReadableActivity = { type: readableActivityType, fields: {}, ts: ts };
+  return {
+    obfuscated: { t: activityType, d: {}, ts: ts },
+    readable: currentReadableActivity
+  };
+}
+
+function addActivityTargets(targets) {
+  var queued = uX(targets.obfuscated.t, targets.obfuscated.d);
+  queued.__readable = targets.readable;
+  readableActivities.push(targets.readable);
+}
+
+async function collectMainFingerprintFields() {
+  var targets = createActivityTargets("TTg8cwtZM0E=", "mainFingerprint");
+  function put(readableKey, value, statusOverride) {
+    setField(targets, getFieldDefinition("TTg8cwtZM0E=", readableKey), value, statusOverride);
+  }
+  var webgl = collectWebglFingerprint();
+  var audio = await collectAudioFingerprint();
+
+  put("browserFlag", true);
+  put("browserConfig", { NL: false, UJ: false });
+  put("numericConstant", 3);
+  put("stringConstant", "simulated", "fallback");
+  put("privateMode", 0, "fallback");
+  put("currentUrl", location.href);
+  put("referrerEncoded", document.referrer ? encodeURIComponent(document.referrer) : "");
+  put("orientationChangeSupport", "onorientationchange" in window || screen.orientation !== undefined);
+  put("timezoneOffset", new Date().getTimezoneOffset());
+  put("chromeObjectDetection", !!(window.chrome && typeof window.chrome === "object"));
+  put("visitorIdHash", je(iD(), navigator.userAgent), "fallback");
+  put("sessionRecoveryHash", je(nh(), navigator.userAgent), "fallback");
+  put("configParameter", APP_ID);
+  put("audioWorkletSupport", !!window.AudioWorklet);
+  put("audioDetectionResult", !!(window.AudioContext || window.webkitAudioContext), "fallback");
+  put("audioRenderSum", audio.audioRenderSum, audio.status);
+  put("audioRenderHash", audio.audioRenderHash, audio.status);
+  put("webglCanvasHash", webgl.webglCanvasHash);
+  put("webglVendor", webgl.webglVendor);
+  put("webglErrors", webgl.webglErrors);
+  put("webglExtensionsHash", webgl.webglExtensionsHash);
+  put("webglParameters", webgl.webglParameters);
+  put("webglParametersHash", webgl.webglParametersHash);
+  put("webglUnmaskedRenderer", webgl.webglUnmaskedRenderer);
+  put("webglShadingLanguageVersion", webgl.webglShadingLanguageVersion);
+  put("canvasEmojiHash", collectCanvasEmojiFingerprint());
+  put("canvasUnicodeHash", collectCanvasUnicodeFingerprint());
+  put("nightmareDetected", !!window.__nightmare);
+  put("phantomDetected", !!window._phantom);
+  put("callPhantomDetected", !!window.callPhantom);
+  put("webRtcSupport", typeof RTCPeerConnection !== "undefined");
+  put("touchPointSupport", navigator.maxTouchPoints || 0);
+  put("navigatorPrototypeDescriptor", !!Object.getPrototypeOf(navigator), "fallback");
+  put("emitSupport", !!window.emit);
+  put("documentAutomationFlag", !!document.__webdriver_script_fn || !!document.$cdc_asdjflasutopfhvcZLmcfl_);
+  put("screenWidth", screen.width || 0);
+  put("screenAvailWidth", screen.availWidth || 0);
+  put("screenColorDepth", screen.colorDepth || 0);
+  put("screenPixelDepth", screen.pixelDepth || 0);
+  put("windowScreenX", window.screenX || 0);
+  put("windowScrollY", window.scrollY || window.pageYOffset || 0);
+  put("windowInnerHeight", window.innerHeight || 0);
+  put("usedJSHeapSize", performance.memory ? performance.memory.usedJSHeapSize : "PX_UNAVAILABLE", performance.memory ? "implemented" : "browser-limited");
+  put("jsHeapSizeLimit", performance.memory ? performance.memory.jsHeapSizeLimit : "PX_UNAVAILABLE", performance.memory ? "implemented" : "browser-limited");
+  put("devicePixelRatio", window.devicePixelRatio || 1);
+  put("automationSignal", !!navigator.webdriver || !!window._phantom || !!window.callPhantom);
+  put("iframeElementSupport", !!window.HTMLIFrameElement);
+  put("showModalDialogSupport", !!window.showModalDialog);
+  put("documentMode", +document.documentMode || 0);
+  put("postMessageNative", isNative(window.postMessage));
+  put("windowOuterHeight", window.outerHeight || 0);
+  put("setTimeoutNative", isNative(window.setTimeout));
+  put("scriptNonce", "", "fallback");
+  put("chromeRuntimeErrorFlag", false, "fallback");
+  put("functionBindNative", isNative(Function.prototype.bind));
+  put("setIntervalNative", isNative(window.setInterval));
+  put("getComputedStyleNative", isNative(window.getComputedStyle));
+  put("pluginCount", navigator.plugins ? navigator.plugins.length : 0);
+  put("navigatorLanguage", navigator.language || navigator.userLanguage || "");
+  put("deviceMemory", navigator.deviceMemory || "unknown");
+  put("pluginsLength", navigator.plugins ? navigator.plugins.length : -1);
+  put("pluginMutationCheck", !!navigator.plugins);
+  put("pluginMutationMirror", !!navigator.plugins);
+  put("pluginEnabledPluginCheck", navigator.plugins && navigator.plugins[0] && navigator.plugins[0][0] ? navigator.plugins[0][0].enabledPlugin === navigator.plugins[0] : false, "browser-limited");
+  put("pluginItemOverflowCheck", false, "browser-limited");
+  put("geolocationMissing", !("geolocation" in navigator));
+  put("navigatorProduct", navigator.product || "");
+  put("mimeTypesToString", navigator.mimeTypes ? String(navigator.mimeTypes) : "");
+  put("mimeTypesToStringMirror", navigator.mimeTypes ? String(navigator.mimeTypes) : "");
+  put("navigatorVendor", navigator.vendor || "");
+  put("permissionQueryNativeName", !!(navigator.permissions && navigator.permissions.query && navigator.permissions.query.name === "query"));
+  put("connectionDownlink", navigator.connection ? navigator.connection.downlink : "PX_UNAVAILABLE", navigator.connection ? "implemented" : "browser-limited");
+  put("connectionType", navigator.connection ? navigator.connection.type || "" : "PX_UNAVAILABLE", navigator.connection ? "implemented" : "browser-limited");
+  put("connectionEffectiveType", navigator.connection ? navigator.connection.effectiveType || "" : "PX_UNAVAILABLE", navigator.connection ? "implemented" : "browser-limited");
+  put("navigatorOnline", navigator.onLine === true);
+  put("geolocationObjectString", String(navigator.geolocation) === "[object Geolocation]");
+  put("javaEnabled", typeof navigator.javaEnabled === "function" ? navigator.javaEnabled() : false);
+  put("cookieEnabled", navigator.cookieEnabled === true);
+  var uaData = navigator.userAgentData || {};
+  put("uaArchitecture", uaData.architecture || "PX_UNAVAILABLE", uaData.architecture ? "implemented" : "browser-limited");
+  put("uaBitness", uaData.bitness || "PX_UNAVAILABLE", uaData.bitness ? "implemented" : "browser-limited");
+  put("uaMobile", uaData.mobile || false, "browser-limited");
+  put("uaPlatform", uaData.platform || navigator.platform || "PX_UNAVAILABLE", uaData.platform ? "implemented" : "browser-limited");
+  put("uaPlatformVersion", uaData.platformVersion || "PX_UNAVAILABLE", uaData.platformVersion ? "implemented" : "browser-limited");
+  put("uaFullVersion", uaData.uaFullVersion || "PX_UNAVAILABLE", uaData.uaFullVersion ? "implemented" : "browser-limited");
+  put("pdfViewerEnabled", !!navigator.pdfViewerEnabled);
+  put("bluetoothSupport", !!navigator.bluetooth);
+  put("sendBeaconSupport", !!navigator.sendBeacon);
+  put("webdriverDetected", !!navigator.webdriver);
+  return targets;
+}
+
+function collectClickFields(eventLike) {
+  var eventData = eventLike || { x: 128, y: 256, type: "click", target: document.body };
+  var targets = createActivityTargets("ajsbMC9eHwE=", "clickTouch");
+  function put(readableKey, value, statusOverride) {
+    setField(targets, getFieldDefinition("ajsbMC9eHwE=", readableKey), value, statusOverride);
+  }
+
+  put("x", eventData.x || eventData.pageX || 0);
+  put("y", eventData.y || eventData.pageY || 0);
+  put("currentUrl", location.href);
+  put("eventType", eventData.type || "click");
+  put("eventTimestamp", Date.now());
+  put("touchDetails", { touches: eventData.touches ? eventData.touches.length : 0 }, "fallback");
+  put("targetElement", eventData.target ? eventData.target.tagName || "unknown" : "unknown");
+  put("interactionData", { button: eventData.button || 0 }, "fallback");
+  return targets;
+}
+
+function collectBehaviorCounterFields() {
+  var targets = createActivityTargets("JVAUW2AzEW8=", "behaviorCounter");
+  function put(readableKey, value, statusOverride) {
+    setField(targets, getFieldDefinition("JVAUW2AzEW8=", readableKey), value, statusOverride);
+  }
+
+  put("behaviorEnabled", true);
+  put("behaviorInterval", 240000);
+  put("behaviorSendCount", 1);
+  put("userAgent", navigator.userAgent);
+  put("behaviorEventCount", 0);
+  return targets;
+}
+
+function collectUnloadBeaconFields() {
+  var targets = createActivityTargets("dyZGbTJCSVo=", "unloadBeacon");
+  function put(readableKey, value, statusOverride) {
+    setField(targets, getFieldDefinition("dyZGbTJCSVo=", readableKey), value, statusOverride);
+  }
+  put("stateValue", "simulated-state", "fallback");
+  put("documentVisibility", document.visibilityState || "visible");
+  put("documentMode", +document.documentMode || 0);
+  put("unloadTiming", { pageInit: pageInitTs, now: Date.now(), delta: Date.now() - pageInitTs }, "fallback");
+  return targets;
+}
+
+function collectCorsFailureFields() {
+  var targets = createActivityTargets("YQxQByRsVzw=", "corsFailure");
+  setField(targets, getFieldDefinition("YQxQByRsVzw=", "failedUrl"), COLLECTOR_URL, "fallback");
+  return targets;
+}
+
+function collectClickVisualFields() {
+  var targets = createActivityTargets("JDFVOmFVUAg=", "clickVisual");
+  function put(readableKey, value, statusOverride) {
+    setField(targets, getFieldDefinition("JDFVOmFVUAg=", readableKey), value, statusOverride);
+  }
+  var rect = document.body.getBoundingClientRect();
+  put("centerX", Math.round(rect.left + rect.width / 2));
+  put("centerY", Math.round(rect.top + rect.height / 2));
+  put("elementWidth", Math.round(rect.width));
+  put("elementLeft", Math.round(rect.left));
+  put("offsetWidth", document.body.offsetWidth || 0);
+  put("offsetHeight", document.body.offsetHeight || 0);
+  put("visualClickCount", 1);
+  return targets;
+}
+
+function collectDomHookFields() {
+  var targets = createActivityTargets("FwZmDVFrZT4=", "domHook");
+  setField(targets, getFieldDefinition("FwZmDVFrZT4=", "hookedStackList"), hN(["querySelector", "getElementById", "evaluate"]), "fallback");
+  return targets;
+}
+
+function collectCspIframeFields() {
+  var targets = createActivityTargets("ZRBUGyByWik=", "cspIframe");
+  function put(readableKey, value, statusOverride) {
+    setField(targets, getFieldDefinition("ZRBUGyByWik=", readableKey), value, statusOverride);
+  }
+  put("iframeCreateTs", Date.now(), "fallback");
+  put("iframeReportTs", Date.now(), "fallback");
+  return targets;
+}
+
+function collectAutomationSignalFields() {
+  var targets = createActivityTargets("O2oKIX4KCho=", "automationSignals");
+  var payload = {
+    PX12705: !!window.OffscreenCanvas,
+    PX12729: !!document.getElementById("claude-agent-stop-container"),
+    PX12735: !!window.__SIGMA__,
+    PX12700: String(console.log).indexOf("captureLogArguments") > -1,
+    PX12696: !!window.GlobalSkyvernFrameIndex
+  };
+  setField(targets, getFieldDefinition("O2oKIX4KCho=", "automationPayload"), payload, "fallback");
+  return targets;
+}
+
+function createEmptyActivityPair(activityType, readableType) {
+  return createActivityTargets(activityType, readableType);
+}
+
+const INJECTED_FIELD_DEFINITIONS = [
+  { obfuscatedKey: "LDldMmpUWwI=", readableKey: "activityIndex", sourceFunction: "uX()", sourceLine: 5079, collectorGroup: "queue", status: "implemented" },
+  { obfuscatedKey: "XQgsAxtpLDE=", readableKey: "sessionOffset", sourceFunction: "uX()", sourceLine: 5079, collectorGroup: "queue", status: "implemented" },
+  { obfuscatedKey: "VidnLBBAZhc=", readableKey: "sessionCounter", sourceFunction: "ys()", sourceLine: 6136, collectorGroup: "public", status: "implemented" },
+  { obfuscatedKey: "V0YmTRIhIHg=", readableKey: "challengeType", sourceFunction: "ys()", sourceLine: 6136, collectorGroup: "public", status: "implemented" },
+  { obfuscatedKey: "LVgcU2g6G2Q=", readableKey: "mobileModeActive", sourceFunction: "ys()", sourceLine: 6136, collectorGroup: "public", status: "implemented" },
+  { obfuscatedKey: "CFU5Hk03PSw=", readableKey: "mobileDataVersion", sourceFunction: "ys()", sourceLine: 6136, collectorGroup: "public", status: "implemented" },
+  { obfuscatedKey: "HUhsQ1gvbnk=", readableKey: "isHttps", sourceFunction: "ys()", sourceLine: 6138, collectorGroup: "public", status: "implemented" },
+  { obfuscatedKey: "LDldMmlbXAk=", readableKey: "serverSessionData", sourceFunction: "ys()", sourceLine: 6140, collectorGroup: "public", status: "implemented" },
+  { obfuscatedKey: "VGFlahECZlg=", readableKey: "visibilityTiming", sourceFunction: "ys()", sourceLine: 6147, collectorGroup: "public", status: "implemented" },
+  { obfuscatedKey: "aRRYHy9zWSg=", readableKey: "publicUuidHash", sourceFunction: "ys()", sourceLine: 6136, collectorGroup: "public", status: "documented-only" },
+  { obfuscatedKey: "RTA0ewBTMko=", readableKey: "publicRequestMarker", sourceFunction: "ys()", sourceLine: 6136, collectorGroup: "public", status: "documented-only" },
+  { obfuscatedKey: "KVQYX2w3Hm8=", readableKey: "publicConfigMarker", sourceFunction: "ys()", sourceLine: 6136, collectorGroup: "public", status: "documented-only" },
+  { obfuscatedKey: "HCktIlpOKBI=", readableKey: "pageInitTimestamp", sourceFunction: "FA[kE]()", sourceLine: 10020, collectorGroup: "send", status: "implemented" },
+  { obfuscatedKey: "CXR4P0wSegU=", readableKey: "appExpireTimeout", sourceFunction: "FA[kE]()", sourceLine: 10021, collectorGroup: "send", status: "implemented" },
+  { obfuscatedKey: "Rld3HAAweSs=", readableKey: "activityStartTimestamp", sourceFunction: "FA[kE]()", sourceLine: 10022, collectorGroup: "send", status: "implemented" },
+  { obfuscatedKey: "YjMTOCdVHQo=", readableKey: "sendTimestamp", sourceFunction: "FA[kE]()", sourceLine: 10024, collectorGroup: "send", status: "implemented" },
+  { obfuscatedKey: "OSQIb39EB1s=", readableKey: "sessionUuid", sourceFunction: "FA[kE]()", sourceLine: 10024, collectorGroup: "send", status: "implemented" },
+  { obfuscatedKey: "PAlNQnloTXQ=", readableKey: "namespaceData", sourceFunction: "FA[kE]()", sourceLine: 10024, collectorGroup: "send", status: "implemented" },
+  { obfuscatedKey: "IxISGWVwEC4=", readableKey: "firstActivity", sourceFunction: "yt()", sourceLine: 6175, collectorGroup: "send", status: "implemented" }
+];
+
+function mirrorInjectedFields(obfuscatedActivitiesAfterFlush) {
+  obfuscatedActivitiesAfterFlush.forEach(function eachActivity(activity, index) {
+    var readable = readableActivities[index];
+    if (!readable) return;
+    INJECTED_FIELD_DEFINITIONS.forEach(function eachDefinition(definition) {
+      if (!Object.prototype.hasOwnProperty.call(activity.d, definition.obfuscatedKey)) return;
+      readable.fields[definition.readableKey] = activity.d[definition.obfuscatedKey];
+      fieldMappings.push({
+        activityType: activity.t,
+        readableActivityType: readable.type,
+        obfuscatedKey: definition.obfuscatedKey,
+        readableKey: definition.readableKey,
+        valuePreview: previewValue(activity.d[definition.obfuscatedKey]),
+        sourceFunction: definition.sourceFunction,
+        sourceLine: definition.sourceLine,
+        collectorGroup: definition.collectorGroup,
+        status: definition.status
+      });
+    });
+  });
+}
+
+function renderFieldMappings() {
+  var rows = fieldMappings.map(function mapField(row) {
+    return `<tr><td>${row.activityType}<br><span class="muted">${row.readableActivityType}</span></td><td>${row.obfuscatedKey}</td><td>${row.readableKey}</td><td>${safeString(row.valuePreview)}</td><td>${row.sourceFunction}<br><span class="muted">行 ${row.sourceLine}</span></td><td>${row.status}</td></tr>`;
+  });
+  $("field-map-tbody").innerHTML = rows.join("");
+}
+
+function renderCoverage() {
+  var summary = fieldMappings.reduce(function reduceSummary(acc, row) {
+    acc.total += 1;
+    acc.byStatus[row.status] = (acc.byStatus[row.status] || 0) + 1;
+    acc.byActivity[row.activityType] = (acc.byActivity[row.activityType] || 0) + 1;
+    return acc;
+  }, { total: 0, byStatus: {}, byActivity: {} });
+  $("field-coverage").textContent = hN(summary);
+}
+
 const ACTIVITY_TYPES = [
   { type: "TTg8cwtZM0E=", name: "主指纹采集", trigger: "页面加载、重新验证", queue: "normal" },
   { type: "ajsbMC9eHwE=", name: "触摸/点击事件", trigger: "触摸/鼠标交互", queue: "priority" },
@@ -438,7 +1069,9 @@ function ys(activities) {
 }
 
 function FA_kE() {
-  var batch = uU.concat(uT, uV).map(function cloneActivity(activity) {
+  var ordered = uU.concat(uT, uV);
+  readableActivities = ordered.map(function mapReadable(activity) { return activity.__readable; }).filter(Boolean);
+  var batch = ordered.map(function cloneActivity(activity) {
     return { t: activity.t, d: Object.assign({}, activity.d), ts: activity.ts };
   });
   uT = [];
@@ -447,23 +1080,31 @@ function FA_kE() {
   return ys(batch);
 }
 
-function seedActivities() {
+async function seedActivities() {
   uT = [];
   uU = [];
   uV = [];
   uS = 0;
-  var fp = collectFingerprint();
-  uX("TTg8cwtZM0E=", fp);
-  uX("ajsbMC9eHwE=", { "cRxAFzR5Ri0=": 128, "M2ICKXYCBR8=": 256, "WQQoDx9pJjk=": location.href, "QSwwZwRLNlY=": "click" });
-  uX("JVAUW2AzEW8=", { "aRRYHy95Xy4=": true, "eypKYT1HTFM=": 240000, "OSQIb3xBC1Q=": 1, "MVwAV3c/A2E=": navigator.userAgent });
-  uX("MD1BNnZRTgU=", {});
-  uX("Slt7EAw2eSI=", {});
+  readableActivities = [];
+  fieldMappings = [];
+  addActivityTargets(await collectMainFingerprintFields());
+  addActivityTargets(collectClickFields());
+  addActivityTargets(collectClickVisualFields());
+  addActivityTargets(collectDomHookFields());
+  addActivityTargets(collectBehaviorCounterFields());
+  addActivityTargets(collectUnloadBeaconFields());
+  addActivityTargets(collectCspIframeFields());
+  addActivityTargets(collectAutomationSignalFields());
+  addActivityTargets(createEmptyActivityPair("MD1BNnZRTgU=", "heartbeat"));
+  addActivityTargets(createEmptyActivityPair("Slt7EAw2eSI=", "corsPreflight"));
+  addActivityTargets(collectCorsFailureFields());
 }
 
-function runProtocolSimulation() {
-  seedActivities();
+async function runProtocolSimulation() {
+  await seedActivities();
   var beforeFlush = { normal: uT.length, priority: uU.length, special: uV.length };
   var result = FA_kE();
+  mirrorInjectedFields(result.activities);
   var request = {
     method: "POST",
     url: COLLECTOR_URL,
@@ -474,6 +1115,10 @@ function runProtocolSimulation() {
   };
   $("queue-state").textContent = hN({ beforeFlush: beforeFlush, afterFlush: { normal: uT.length, priority: uU.length, special: uV.length } });
   $("activity-json").textContent = hN(result.activities);
+  $("obfuscated-activity-json").textContent = hN(result.activities);
+  $("readable-activity-json").textContent = hN(readableActivities);
+  renderFieldMappings();
+  renderCoverage();
   $("final-body").textContent = request.body;
   $("url-params").textContent = request.body;
   $("pipeline-code").textContent = [
