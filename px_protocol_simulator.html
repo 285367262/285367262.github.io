@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>PerimeterX (PX) SDK Protocol Simulator</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --text-secondary: #8b949e; --accent: #58a6ff;
+    --success: #238636; --warn: #d29922; --danger: #da3633;
+    --font: 'Segoe UI', 'Microsoft YaHei', system-ui, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.6; overflow-x: hidden; }
+  header { padding: 2rem 1rem; text-align: center; border-bottom: 1px solid var(--border); background: linear-gradient(90deg, #161b22 0%, #0d1117 100%); }
+  h1 { margin: 0; font-size: 1.6rem; color: var(--accent); }
+  h2 { margin: 1.5rem 0 .8rem; font-size: 1.15rem; border-left: 4px solid var(--accent); padding-left: .6rem; }
+  .container { max-width: 1280px; margin: 0 auto; padding: 1rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.2rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; transition: transform .15s, box-shadow .15s; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+  .card h3 { margin: 0 0 .6rem; font-size: 1.05rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: .4rem; display: flex; align-items: center; gap: .4rem; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, 'Cascadia Code', 'Consolas', monospace; font-size: .85rem; }
+  pre { background: #0d1117; padding: .8rem; border-radius: 6px; overflow-x: auto; border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: .3rem; }
+  th, td { border: 1px solid var(--border); padding: .45rem .55rem; text-align: left; vertical-align: top; }
+  th { background: #1c2128; color: var(--accent); font-weight: 600; }
+  tbody tr:hover { background: rgba(88,166,255,.08); }
+  td:nth-child(2) { color: var(--warn); word-break: break-all; }
+  .pipeline { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .6rem 0; }
+  .pipe-step { background: #21262d; border: 1px solid var(--border); border-radius: 6px; padding: .4rem .7rem; font-size: .8rem; }
+  .pipe-arrow { color: var(--accent); font-weight: 700; }
+  .badge { background: var(--accent); color: #000; font-size: .7rem; padding: .15rem .45rem; border-radius: 999px; font-weight: 700; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .35rem; }
+  .status-dot.ok { background: var(--success); } .status-dot.warn { background: var(--warn); } .status-dot.err { background: var(--danger); }
+  .copy-btn { float: right; background: #21262d; border: 1px solid var(--border); color: var(--text); padding: .25rem .6rem; border-radius: 4px; cursor: pointer; font-size: .75rem; }
+  .copy-btn:hover { background: var(--accent); color: #000; }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0; }
+  .btn { background: #21262d; border: 1px solid var(--border); color: var(--text); padding: .45rem .75rem; border-radius: 6px; cursor: pointer; }
+  .btn:hover { background: var(--accent); color: #000; }
+  .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+  .muted { color: var(--text-secondary); }
+  .ok { color: #7ee787; }
+  .warn { color: #f2cc60; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>PerimeterX (PX) SDK 协议模拟器</h1>
+  <p>一比一还原 /api/v2/msft 采集、加密与上报全流程（仅本地展示，不发送真实请求）</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:.8rem 1.4rem;font-size:.85rem;">
+      <div><span class="status-dot ok"></span>AppID: <b>PXdOjV695v</b></div>
+      <div><span class="status-dot ok"></span>SDK 版本: <b>main.min.js</b> (11077 行)</div>
+      <div><span class="status-dot warn"></span>混淆: 91 字符变长解码器 + Base64 + XOR</div>
+      <div><span class="status-dot ok"></span>协议: /api/v2/msft (运行时覆盖)</div>
+    </div>
+  </div>
+
+  <h2>1. URL 参数组装</h2>
+  <div class="card">
+    <button class="copy-btn" onclick="copy('url-params')">复制</button>
+    <h3>外层信封参数映射</h3>
+    <table>
+      <thead><tr><th>参数名</th><th>来源/解码</th><th>生成器/行号</th><th>说明</th></tr></thead>
+      <tbody id="url-params-tbody"></tbody>
+    </table>
+    <pre id="url-params"></pre>
+  </div>
+
+  <h2>2. 实时采集 - 浏览器指纹</h2>
+  <div class="grid" id="fingerprint-grid"></div>
+
+  <h2>3. 字段语义映射</h2>
+  <div class="card">
+    <h3><span class="badge">Dict</span> 公共字段与发送时字段</h3>
+    <table>
+      <thead><tr><th>编码键</th><th>解码语义</th><th>来源/示例值</th></tr></thead>
+      <tbody id="fields-tbody"></tbody>
+    </table>
+  </div>
+
+  <h2>4. 加密管道模拟</h2>
+  <div class="card">
+    <h3><span class="badge">Pipe</span> vH() -> hN() -> jl(..., iH=50) -> hE() -> vD() -> vF() -> vI()</h3>
+    <div class="pipeline" id="pipeline"></div>
+    <pre id="pipeline-code"></pre>
+  </div>
+
+  <h2>5. 活动类型与队列</h2>
+  <div class="grid" id="activity-grid"></div>
+
+  <h2>6. 一比一函数链模拟</h2>
+  <div class="card">
+    <h3><span class="badge">Call Chain</span> uX() -> FA_kE() -> ys() -> vH()</h3>
+    <div class="actions">
+      <button class="btn" onclick="runProtocolSimulation()">重新生成模拟请求</button>
+      <button class="btn" onclick="copy('final-body')">复制 POST Body</button>
+      <button class="btn" onclick="copy('activity-json')">复制活动 JSON</button>
+    </div>
+    <div class="two-col">
+      <div>
+        <h3>队列状态</h3>
+        <pre id="queue-state"></pre>
+      </div>
+      <div>
+        <h3>活动 JSON</h3>
+        <pre id="activity-json"></pre>
+      </div>
+    </div>
+    <h3>最终 POST Body</h3>
+    <pre id="final-body"></pre>
+  </div>
+
+  <h2>7. 请求配置 & 容错链</h2>
+  <div class="card">
+    <h3><span class="badge">XHR</span> 请求头与回退策略</h3>
+    <div id="xhr-kv"></div>
+  </div>
+
+  <h2>8. 原始代码关键行号索引</h2>
+  <div class="card">
+    <button class="copy-btn" onclick="copy('src-index')">复制</button>
+    <pre id="src-index"></pre>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function copy(id) {
+  const value = $(id).textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(value).then(() => alert('已复制')).catch(() => fallbackCopy(value));
+  } else {
+    fallbackCopy(value);
+  }
+}
+
+function fallbackCopy(value) {
+  const area = document.createElement('textarea');
+  area.value = value;
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  document.body.removeChild(area);
+  alert('已复制');
+}
+
+const APP_ID = "PXdOjV695v";
+const COLLECTOR_URL = "https://collector-PXdOjV695v.px-cloud.net/api/v2/msft/xhr";
+const iH = 50;
+let yr = 0;
+let Es = 0;
+let uS = 0;
+const pageInitTs = Date.now();
+const activityStartTs = Date.now();
+
+function safeString(value) {
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return hN(value);
+}
+
+function hD(value) {
+  try { return decodeURIComponent(escape(atob(value))); }
+  catch (error) { return atob(value); }
+}
+
+function hE(value) {
+  try { return btoa(unescape(encodeURIComponent(value))); }
+  catch (error) { return btoa(value); }
+}
+
+function hN(value) {
+  return JSON.stringify(value, function replacer(key, item) {
+    if (item instanceof Error) return { name: item.name, message: item.message };
+    if (typeof item === "function") return "[function]";
+    if (typeof item === "symbol") return item.toString();
+    return item;
+  });
+}
+
+function jl(value, key) {
+  return String(value).split("").map(function mapChar(char) {
+    return String.fromCharCode(char.charCodeAt(0) ^ key);
+  }).join("");
+}
+
+function jm(value) {
+  return String(value).split("").filter(function filterChar(_, index) {
+    return index % 2 === 0;
+  }).join("");
+}
+
+function je(value, key) {
+  var numericKey = 0;
+  String(key).split("").forEach(function eachChar(char) {
+    numericKey = (numericKey + char.charCodeAt(0)) % 255;
+  });
+  return hE(jm(jl(value, numericKey || 1))).slice(0, 32);
+}
+
+function vD() {
+  return hE("px:" + APP_ID + ":" + pageInitTs).slice(0, 12);
+}
+
+function vF(key, length) {
+  var positions = [];
+  var cursor = 0;
+  for (var index = 0; index < key.length; index += 1) {
+    cursor = (cursor + key.charCodeAt(index) + index) % (length + 1);
+    positions.push(cursor);
+  }
+  return positions.sort(function sortNumber(a, b) { return a - b; });
+}
+
+function vI(key, data, positions) {
+  var output = String(data);
+  for (var index = 0; index < key.length; index += 1) {
+    var position = Math.min((positions[index] || 0) + index, output.length);
+    output = output.slice(0, position) + key.charAt(index) + output.slice(position);
+  }
+  return output;
+}
+
+function vH(activities) {
+  var dataOnly = activities.map(function mapActivity(activity) { return activity.d; });
+  var serialized = hN(dataOnly);
+  var xored = jl(serialized, iH);
+  var encoded = hE(xored);
+  var key = vD();
+  var positions = vF(key, encoded.length);
+  return {
+    dataOnly: dataOnly,
+    serialized: serialized,
+    xoredBase64: hE(xored),
+    insertKey: key,
+    positions: positions,
+    payload: vI(key, encoded, positions)
+  };
+}
+
+function safeCall(label, callback, fallback) {
+  try { return callback(); }
+  catch (error) { return fallback === undefined ? label + ":" + error.message : fallback; }
+}
+
+function collectFingerprint() {
+  const fp = {};
+  fp.screen = safeCall("screen", () => ({ w: screen.width, h: screen.height, d: screen.colorDepth, availW: screen.availWidth, availH: screen.availHeight }), {});
+  fp.plugins = safeCall("plugins", () => navigator.plugins ? navigator.plugins.length : 0, 0);
+  fp.lang = safeCall("lang", () => navigator.language || navigator.userLanguage || "", "");
+  fp.platform = safeCall("platform", () => navigator.platform, "");
+  fp.userAgent = safeCall("userAgent", () => navigator.userAgent, "");
+  fp.memory = safeCall("deviceMemory", () => navigator.deviceMemory || "unknown", "unknown");
+  fp.cores = safeCall("hardwareConcurrency", () => navigator.hardwareConcurrency || "unknown", "unknown");
+  fp.webdriver = safeCall("webdriver", () => navigator.webdriver || false, false);
+  fp.touch = safeCall("touch", () => 'ontouchstart' in window, false);
+  fp.webgl = safeCall("webgl", () => !!document.createElement('canvas').getContext('webgl'), false);
+  fp.webglVendor = safeCall("webglVendor", () => {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl');
+    return gl ? gl.getParameter(gl.VENDOR) : 'N/A';
+  }, 'N/A');
+  fp.timezone = safeCall("timezone", () => Intl.DateTimeFormat().resolvedOptions().timeZone, "unknown");
+  fp.cookieEnabled = safeCall("cookieEnabled", () => navigator.cookieEnabled, false);
+  fp.doNotTrack = safeCall("doNotTrack", () => navigator.doNotTrack || "", "");
+  fp.sessionStorage = safeCall("sessionStorage", () => !!window.sessionStorage, false);
+  fp.localStorage = safeCall("localStorage", () => !!window.localStorage, false);
+  fp.indexedDB = safeCall("indexedDB", () => !!window.indexedDB, false);
+  fp.beacon = safeCall("sendBeacon", () => !!navigator.sendBeacon, false);
+  fp.battery = safeCall("battery", () => !!navigator.getBattery, false);
+  fp.bluetooth = safeCall("bluetooth", () => !!navigator.bluetooth, false);
+  fp.usb = safeCall("usb", () => !!navigator.usb, false);
+  fp.mimeTypes = safeCall("mimeTypes", () => navigator.mimeTypes ? navigator.mimeTypes.length : 0, 0);
+  fp.pdfViewerEnabled = safeCall("pdfViewerEnabled", () => navigator.pdfViewerEnabled, false);
+  fp._phantom = safeCall("_phantom", () => !!window._phantom, false);
+  fp.__nightmare = safeCall("__nightmare", () => !!window.__nightmare, false);
+  fp.callPhantom = safeCall("callPhantom", () => !!window.callPhantom, false);
+  fp.selenium = safeCall("selenium", () => !!document.documentElement.getAttribute("webdriver"), false);
+  fp.domAutomation = safeCall("domAutomation", () => !!navigator.domAutomation, false);
+  fp.chromeRuntime = safeCall("chromeRuntime", () => !!(window.chrome && window.chrome.runtime), false);
+  fp.innerWidth = window.innerWidth;
+  fp.innerHeight = window.innerHeight;
+  fp.outerWidth = window.outerWidth;
+  fp.outerHeight = window.outerHeight;
+  fp.devicePixelRatio = window.devicePixelRatio;
+  fp.timing = safeCall("timing", () => performance.timing ? {
+    dns: performance.timing.domainLookupEnd - performance.timing.domainLookupStart,
+    tcp: performance.timing.connectEnd - performance.timing.connectStart,
+    request: performance.timing.responseEnd - performance.timing.responseStart,
+    dom: performance.timing.domComplete - performance.timing.domLoading
+  } : {}, {});
+  fp.webrtc = safeCall("webrtc", () => typeof RTCPeerConnection !== "undefined", false);
+  return fp;
+}
+
+const ACTIVITY_TYPES = [
+  { type: "TTg8cwtZM0E=", name: "主指纹采集", trigger: "页面加载、重新验证", queue: "normal" },
+  { type: "ajsbMC9eHwE=", name: "触摸/点击事件", trigger: "触摸/鼠标交互", queue: "priority" },
+  { type: "JDFVOmFVUAg=", name: "点击视觉事件", trigger: "点击视觉事件", queue: "priority" },
+  { type: "FwZmDVFrZT4=", name: "DOM 钩子", trigger: "MutationObserver", queue: "normal" },
+  { type: "O2oKIX4KCho=", name: "自定义元素", trigger: "Shadow-DOM 探测", queue: "normal" },
+  { type: "dyZGbTJCSVo=", name: "关闭/卸载信标", trigger: "beforeunload / visibilitychange", queue: "normal" },
+  { type: "JVAUW2AzEW8=", name: "行为计数器", trigger: "定期聚合", queue: "normal" },
+  { type: "ZRBUGyByWik=", name: "CSP/Iframe 信号", trigger: "CSP 违规", queue: "priority" },
+  { type: "RTA0ewBTM04=", name: "递归验证", trigger: "挑战重新验证", queue: "normal" },
+  { type: "eWRILz8GTho=", name: "错误信标", trigger: "JS 错误、超时", queue: "normal" },
+  { type: "Slt7EAw2eSI=", name: "CORS 预检", trigger: "跨域测试", queue: "priority" },
+  { type: "YQxQByRsVzw=", name: "CORS 失败", trigger: "CORS 被阻止", queue: "normal" },
+  { type: "MD1BNnZRTgU=", name: "心跳", trigger: "定期保活", queue: "normal" },
+  { type: "Y1JSWSYxUG4=", name: "特殊活动", trigger: "特殊队列", queue: "special" },
+  { type: "WitrIBxIZRA=", name: "优先级触发", trigger: "进入 uU[]", queue: "priority" },
+  { type: "IC1RJmVOUxI=", name: "特殊触发", trigger: "FA[kN]", queue: "special" }
+];
+
+var uT = [];
+var uU = [];
+var uV = [];
+
+function mg() {
+  if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function replaceUuid(char) {
+    var value = Math.random() * 16 | 0;
+    return (char === "x" ? value : (value & 0x3 | 0x8)).toString(16);
+  });
+}
+
+function nh() { return window.__px_uuid || (window.__px_uuid = mg()); }
+function nj() { return window.__px_xuuid || (window.__px_xuuid = "x_" + mg()); }
+function iD() { return window.__px_vid || (window.__px_vid = "vid_" + Math.random().toString(36).slice(2)); }
+function pa() { return readCookie("_pxhd"); }
+function pb() { return readCookie("_pxac"); }
+function pc() { return location.protocol === "https:"; }
+function pi() { return safeCall("px_ssd", () => sessionStorage.getItem("px_ssd") || "", ""); }
+function sS() { return "PX11745"; }
+function xd() { return 1; }
+function xg() { return /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent); }
+function yl() { return { PX12738: document.visibilityState, PX12739: pageInitTs, PX12740: Date.now(), PX12741: Date.now() - pageInitTs }; }
+function oP() { return pageInitTs; }
+function oQ() { return activityStartTs; }
+function oL() { return 3600; }
+function Em() { return ""; }
+function En() { return ""; }
+function te() { return "simulated-ci"; }
+
+function readCookie(name) {
+  return document.cookie.split(";").map(function trimCookie(cookie) { return cookie.trim(); }).filter(function matchCookie(cookie) {
+    return cookie.indexOf(name + "=") === 0;
+  }).map(function cookieValue(cookie) { return decodeURIComponent(cookie.slice(name.length + 1)); })[0] || "";
+}
+
+function createActivity(type, data) { return { t: type, d: data, ts: Date.now() }; }
+
+function vg(type) {
+  return ["ajsbMC9eHwE=", "JDFVOmFVUAg=", "ZRBUGyByWik=", "Slt7EAw2eSI=", "WitrIBxIZRA="].indexOf(type) !== -1;
+}
+
+function vh(type) {
+  return ["Y1JSWSYxUG4=", "IC1RJmVOUxI="].indexOf(type) !== -1;
+}
+
+function uY(type, data) { return { t: type, d: data, ts: Date.now() }; }
+
+function uX(type, data) {
+  data["LDldMmpUWwI="] = uS++;
+  data["XQgsAxtpLDE="] = Date.now() - pageInitTs;
+  var activity = uY(type, data);
+  if (vg(type)) uU.push(activity);
+  else if (vh(type)) uV.push(activity);
+  else uT.push(activity);
+  return activity;
+}
+
+function injectPublicFields(activity) {
+  activity.d["VidnLBBAZhc="] = uS;
+  activity.d["V0YmTRIhIHg="] = sS();
+  activity.d["LVgcU2g6G2Q="] = xg();
+  activity.d["CFU5Hk03PSw="] = xd();
+  activity.d["HUhsQ1gvbnk="] = pc();
+  activity.d["LDldMmlbXAk="] = pi();
+  activity.d["VGFlahECZlg="] = yl();
+  if (activity.t === "TTg8cwtZM0E=" || activity.t === "dyZGbTJCSVo=") {
+    activity.d["HCktIlpOKBI="] = oP();
+    activity.d["CXR4P0wSegU="] = oL();
+    activity.d["Rld3HAAweSs="] = oQ();
+  }
+  activity.d["YjMTOCdVHQo="] = Date.now();
+  activity.d["OSQIb39EB1s="] = nh();
+  activity.d["PAlNQnloTXQ="] = Em();
+  activity.d["namespace_status"] = En();
+  return activity;
+}
+
+function yt(activities) {
+  if (activities[0]) activities[0].d["IxISGWVwEC4="] = true;
+  return activities;
+}
+
+function yu(tag, ft) { return [nh(), tag, ft].join(":"); }
+
+function ys(activities) {
+  var tag = "v3";
+  var ft = Date.now();
+  var prepared = yt(activities.map(injectPublicFields));
+  var encoded = vH(prepared);
+  var checksum = je(hN(prepared), yu(tag, ft));
+  var params = new URLSearchParams();
+  params.set("payload", encoded.payload);
+  params.set("appId", APP_ID);
+  params.set("tag", tag);
+  params.set("uuid", nh());
+  params.set("ft", String(ft));
+  params.set("seq", String(yr++));
+  params.set("en", "NTA");
+  params.set("xuuid", nj());
+  params.set("cs", checksum);
+  params.set("pc", "1");
+  params.set("sid", "sid_" + nh().slice(0, 8));
+  params.set("vid", iD());
+  params.set("jsc", Math.random().toString(36).slice(2));
+  params.set("ci", te());
+  if (pa()) params.set("pxhd", pa());
+  params.set("rsc", String(++Es));
+  params.set("cts", String(Date.now()));
+  if (pb()) params.set("pxac", pb());
+  params.set("hid", "simulated-hid");
+  return { activities: prepared, encoded: encoded, body: params.toString() };
+}
+
+function FA_kE() {
+  var batch = uU.concat(uT, uV).map(function cloneActivity(activity) {
+    return { t: activity.t, d: Object.assign({}, activity.d), ts: activity.ts };
+  });
+  uT = [];
+  uU = [];
+  uV = [];
+  return ys(batch);
+}
+
+function seedActivities() {
+  uT = [];
+  uU = [];
+  uV = [];
+  uS = 0;
+  var fp = collectFingerprint();
+  uX("TTg8cwtZM0E=", fp);
+  uX("ajsbMC9eHwE=", { "cRxAFzR5Ri0=": 128, "M2ICKXYCBR8=": 256, "WQQoDx9pJjk=": location.href, "QSwwZwRLNlY=": "click" });
+  uX("JVAUW2AzEW8=", { "aRRYHy95Xy4=": true, "eypKYT1HTFM=": 240000, "OSQIb3xBC1Q=": 1, "MVwAV3c/A2E=": navigator.userAgent });
+  uX("MD1BNnZRTgU=", {});
+  uX("Slt7EAw2eSI=", {});
+}
+
+function runProtocolSimulation() {
+  seedActivities();
+  var beforeFlush = { normal: uT.length, priority: uU.length, special: uV.length };
+  var result = FA_kE();
+  var request = {
+    method: "POST",
+    url: COLLECTOR_URL,
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    withCredentials: false,
+    timeout: 15000,
+    body: result.body
+  };
+  $("queue-state").textContent = hN({ beforeFlush: beforeFlush, afterFlush: { normal: uT.length, priority: uU.length, special: uV.length } });
+  $("activity-json").textContent = hN(result.activities);
+  $("final-body").textContent = request.body;
+  $("url-params").textContent = request.body;
+  $("pipeline-code").textContent = [
+    "request: " + hN({ method: request.method, url: request.url, headers: request.headers, withCredentials: request.withCredentials, timeout: request.timeout }),
+    "dataOnly: " + hN(result.encoded.dataOnly),
+    "serialized: " + result.encoded.serialized,
+    "xoredBase64: " + result.encoded.xoredBase64,
+    "insertKey: " + result.encoded.insertKey,
+    "positions: " + result.encoded.positions.join(","),
+    "payload: " + result.encoded.payload
+  ].join("\n");
+}
+
+function render() {
+  const urlParams = [
+    { name: "payload", src: "cGF5bG9hZD0=", generator: "ys() -> vH()", row: "3032 / 6155", desc: "加密后的活动数据块" },
+    { name: "appId", src: "YXBwSWQ9", generator: "FA[kB]", row: "3033", desc: "应用固定标识 PXdOjV695v" },
+    { name: "tag", src: "dGFnPQ==", generator: "FA[kC]", row: "3034", desc: "配置标签 / 挑战类型" },
+    { name: "uuid", src: "dXVpZD0=", generator: "nh()", row: "3035", desc: "会话 UUID" },
+    { name: "xuuid", src: "gu(186)=eHV1aWQ9", generator: "nj()", row: "3036 / 6160", desc: "辅助 UUID" },
+    { name: "ft", src: "ZnQ9", generator: "FA[kD]", row: "3037", desc: "功能令牌 / 时间字段" },
+    { name: "seq", src: "c2VxPQ==", generator: "yr++", row: "3038", desc: "请求序列号" },
+    { name: "cs", src: "Y3M9", generator: "je()", row: "3039 / 2255", desc: "载荷校验和" },
+    { name: "pc", src: "cGM9", generator: "pc() / checksum slot", row: "3040", desc: "页面计数器 / 校验相关字段" },
+    { name: "sid", src: "c2lkPQ==", generator: "n[kH]() + yn(oX())", row: "3041", desc: "Session ID" },
+    { name: "vid", src: "dmlkPQ==", generator: "iD()", row: "3042", desc: "Visitor ID" },
+    { name: "jsc", src: "anNjPQ==", generator: "nK", row: "3043", desc: "JS 挑战标志 / 随机数" },
+    { name: "ci", src: "Y2k9", generator: "te()", row: "3044", desc: "挑战标识符" },
+    { name: "pxhd", src: "cHhoZD0=", generator: "pa()", row: "3045", desc: "_pxhd Cookie" },
+    { name: "en", src: "ZW49", generator: "yq", row: "3046", desc: "编码版本 NTA" },
+    { name: "rsc", src: "cnNjPQ==", generator: "++Es", row: "3047", desc: "HTTP 请求递增计数器" },
+    { name: "cts", src: "Y3RzPQ==", generator: "nM", row: "3048", desc: "验证码时间戳" },
+    { name: "pxac", src: "cHhhYz0=", generator: "pb()", row: "3049", desc: "_pxac Cookie" },
+    { name: "hid", src: "aGlkPQ==", generator: "nN", row: "3050", desc: "硬件 ID" }
+  ];
+  $('url-params-tbody').innerHTML = urlParams.map(p => `<tr><td>${p.name}</td><td>${p.src}</td><td>${p.generator}<br><span class="muted">行 ${p.row}</span></td><td>${p.desc}</td></tr>`).join('');
+
+  const fp = collectFingerprint();
+  const fpCards = [
+    { title: "屏幕与显示", data: fp.screen },
+    { title: "浏览器核心", data: { plugins: fp.plugins, lang: fp.lang, platform: fp.platform, memory: fp.memory, cores: fp.cores, timezone: fp.timezone } },
+    { title: "自动化检测", data: { webdriver: fp.webdriver, _phantom: fp._phantom, __nightmare: fp.__nightmare, selenium: fp.selenium, domAutomation: fp.domAutomation } },
+    { title: "硬件/API", data: { touch: fp.touch, webgl: fp.webgl, webglVendor: fp.webglVendor, beacon: fp.beacon, battery: fp.battery, bluetooth: fp.bluetooth, usb: fp.usb } },
+    { title: "窗口与存储", data: { innerWidth: fp.innerWidth, innerHeight: fp.innerHeight, outerWidth: fp.outerWidth, outerHeight: fp.outerHeight, localStorage: fp.localStorage, sessionStorage: fp.sessionStorage, indexedDB: fp.indexedDB } },
+    { title: "性能计时", data: fp.timing }
+  ];
+  $('fingerprint-grid').innerHTML = fpCards.map(c => `
+    <div class="card"><h3>${c.title}</h3><table>${Object.entries(c.data).map(([k,v]) => `<tr><td>${k}</td><td>${safeString(v)}</td></tr>`).join('')}</table></div>
+  `).join('');
+
+  const fields = [
+    { key: "VidnLBBAZhc=", semantic: "会话计数器", value: "iw / uS" },
+    { key: "V0YmTRIhIHg=", semantic: "挑战类型", value: "sS() - PX11745/PX11978/PX12635" },
+    { key: "LVgcU2g6G2Q=", semantic: "移动模式激活", value: "xg() - true/false" },
+    { key: "CFU5Hk03PSw=", semantic: "移动数据版本", value: "xd() - 整数 (1-4)" },
+    { key: "aRRYHy9zWSg=", semantic: "移动标志", value: "xv (如果已设置)" },
+    { key: "STQ4fw9WOEU=", semantic: "移动应用数据", value: "nd() - 操作模式" },
+    { key: "HUhsQ1gvbnk=", semantic: "是否 HTTPS", value: "pc()" },
+    { key: "HCktIllKKRg=", semantic: "CSP 预检结果", value: "sW()" },
+    { key: "LDldMmlbXAk=", semantic: "服务端会话数据", value: "pi() - px_ssd" },
+    { key: "RTA0ewBTMko=", semantic: "_px3 Cookie", value: "lS('_px3')" },
+    { key: "KVQYX2w3Hm8=", semantic: "_px2 Cookie", value: "lS('_px2')" },
+    { key: "VGFlahECZlg=", semantic: "页面可见性计时", value: "yl()" },
+    { key: "HCktIlpOKBI=", semantic: "页面初始化时间戳", value: "oP()" },
+    { key: "CXR4P0wSegU=", semantic: "应用过期超时", value: "oL() = 3600" },
+    { key: "Rld3HAAweSs=", semantic: "活动开始时间戳", value: "oQ()" },
+    { key: "YjMTOCdVHQo=", semantic: "发送时间戳", value: "Date.now()" },
+    { key: "OSQIb39EB1s=", semantic: "会话 UUID", value: "nh()" },
+    { key: "PAlNQnloTXQ=", semantic: "命名空间数据", value: "Em()" },
+    { key: "IxISGWVwEC4=", semantic: "首个活动标志", value: "yt()" },
+    { key: "LDldMmpUWwI=", semantic: "活动索引", value: "uX() / uS++" },
+    { key: "XQgsAxtpLDE=", semantic: "会话偏移", value: "uX() / Date.now() - pageInitTs" }
+  ];
+  $('fields-tbody').innerHTML = fields.map(f => `<tr><td>${f.key}</td><td>${f.semantic}</td><td>${f.value}</td></tr>`).join('');
+
+  const pipelineSteps = ["Activity Array", "yt(t)", "hN(t)", "jl(50)", "hE()", "vD()", "vF()", "vI()", "Final Payload"];
+  $('pipeline').innerHTML = pipelineSteps.map((s, i) => `<div class="pipe-step">${s}</div>${i < pipelineSteps.length - 1 ? '<span class="pipe-arrow">-></span>' : ''}`).join('');
+
+  $('activity-grid').innerHTML = ACTIVITY_TYPES.map(a => `
+    <div class="card">
+      <h3><span class="badge">${a.queue}</span> ${a.name}</h3>
+      <table><tr><td>编码值</td><td>${a.type}</td></tr><tr><td>触发条件</td><td>${a.trigger}</td></tr><tr><td>队列</td><td>${a.queue}</td></tr></table>
+    </div>
+  `).join('');
+
+  $('xhr-kv').innerHTML = `
+    <table>
+      <tr><th>配置项</th><th>值</th></tr>
+      <tr><td>Method</td><td>POST</td></tr>
+      <tr><td>URL</td><td>${COLLECTOR_URL}</td></tr>
+      <tr><td>Content-Type</td><td>application/x-www-form-urlencoded</td></tr>
+      <tr><td>withCredentials</td><td>false</td></tr>
+      <tr><td>Timeout</td><td>15000 ms</td></tr>
+      <tr><td>Fallback Chain</td><td>主域 POST -> 备用域 POST -> Bundle POST -> Botchk POST -> sendBeacon -> Image Pixel</td></tr>
+      <tr><td>安全约束</td><td><span class="ok">本页面只渲染模拟 body，不执行真实网络发送</span></td></tr>
+    </table>
+  `;
+
+  $('src-index').textContent = `
+核心函数与行号索引:
+  DY()      : 9419-9444   - 路由覆盖 (/api/v2/collector -> /api/v2/msft)
+  mF~mX     : 3032-3050   - URL 参数键 payload/appId/tag/uuid/xuuid/ft/seq/cs/pc/sid/vid/jsc/ci/pxhd/en/rsc/cts/pxac/hid
+  ys()      : 6133-6171   - 核心序列化函数 (公共字段注入 + URL body 组装)
+  yt()      : 6172        - 首个活动标记 IxISGWVwEC4=
+  yu()      : 6177        - 校验和密钥 <uuid>:<tag>:<ft>
+  vH()      : 5212-5218   - 完整编码管道 (提取 .d -> 序列化 -> XOR -> Base64 -> 密钥插入)
+  vD()      : 5163        - 生成插入密钥
+  vF()      : 5179        - 计算插入位置
+  vI()      : 5221        - 交织密钥与载荷
+  hN()      : 1613        - 自定义 JSON 序列化器
+  je()      : 2255        - 校验和生成器
+  jl(t,n)   : 2314        - XOR 编码器
+  hD()/hE() : 1510/1513   - Base64 编解码器
+  gq(t)     : 5           - 91字符变长解码器
+  gu(t)     : 1226/1241   - 带字符串表 gt[] 的解码器
+  uX()      : 5078        - 活动入队函数
+  uY()      : 5081        - 活动包装 {t,d,ts}
+  Ip()      : 10931       - 指纹采集器调度 (17个采集器)
+  FA[kE]    : 10014-10024 - 发送调度与最终分发
+  Ep()/Et() : 9587-9614   - XHR POST 分发，withCredentials=false，超时15秒
+  Ev()/Ew() : fallback    - sendBeacon / Image pixel no-cors 回退
+  `;
+
+  runProtocolSimulation();
+}
+
+window.onload = render;
+</script>
+</body>
+</html>
