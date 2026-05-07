@@ -338,6 +338,109 @@ function safeCall(label, callback, fallback) {
   catch (error) { return fallback === undefined ? label + ":" + error.message : fallback; }
 }
 
+function io() {
+  return Date.now();
+}
+
+function lQ() {
+  try {
+    null[0];
+  } catch (error) {
+    return error.stack || "";
+  }
+  return "";
+}
+
+function qh() {
+  return pageInitTs;
+}
+
+function qj(value) {
+  return (value || io()) - (qh() || 0);
+}
+
+function pZ(source, coords) {
+  if (source && typeof source.clientX === "number" && typeof source.clientY === "number") {
+    coords.x = +(source.clientX || -1).toFixed(2);
+    coords.y = +(source.clientY || -1).toFixed(2);
+  }
+}
+
+function pY(eventLike) {
+  var coords = {};
+  if (!eventLike) return coords;
+  var touches = eventLike.touches || eventLike.changedTouches;
+  pZ(touches ? touches[0] : eventLike, coords);
+  return coords;
+}
+
+function pT(eventLike) {
+  var value;
+  if (eventLike && Object.prototype.hasOwnProperty.call(eventLike, "isTrusted")) {
+    value = eventLike.isTrusted && "false" !== eventLike.isTrusted ? "true" : "false";
+  }
+  return value;
+}
+
+function pU(eventLike) {
+  if (eventLike) return eventLike.target || eventLike.toElement || eventLike.srcElement;
+}
+
+function pV(element) {
+  if (!element) return null;
+  var parent = element.parentNode || element.parentElement;
+  return parent && parent.nodeType !== 11 ? parent : null;
+}
+
+function pR(element, parent) {
+  if (!element || !parent) return "";
+  if (element.tagName && parent.getElementsByTagName && parent.getElementsByTagName(element.tagName).length === 1) return element.tagName;
+  for (var index = 0; parent.children && index < parent.children.length; index += 1) {
+    if (parent.children[index] === element) return element.tagName + ":nth-child(" + (index + 1) + ")";
+  }
+  return element.tagName || "";
+}
+
+function pQ(selector) {
+  try {
+    return document.querySelectorAll(selector).length === 1;
+  } catch (error) {
+    return false;
+  }
+}
+
+function pP(element) {
+  if (element.id) return "#" + element.id;
+  var selector = "";
+  for (var depth = 0; depth < 20; depth += 1) {
+    if (!(element && element instanceof Element)) return selector;
+    if (element.tagName && element.tagName.toLowerCase() === "html") return selector;
+    if (element.id) return "#" + element.id + selector;
+    var parent = pV(element);
+    if (!(parent instanceof Element)) return element.tagName + selector;
+    selector = pR(element, parent) + selector;
+    if (pQ(selector)) return selector;
+    element = parent;
+    selector = ">" + selector;
+  }
+  return selector;
+}
+
+function pO(element) {
+  if (!(element && (element instanceof Element || element.nodeType === 1))) return "";
+  try {
+    return pP(element).replace(/^>/, "") || element.id || element.tagName || "";
+  } catch (error) {
+    return element.id || element.tagName || "";
+  }
+}
+
+function qe(element) {
+  try {
+    return !!(element.offsetWidth || element.offsetHeight || (element.getClientRects && element.getClientRects().length));
+  } catch (error) {}
+}
+
 function collectFingerprint() {
   const fp = {};
   fp.screen = safeCall("screen", () => ({ w: screen.width, h: screen.height, d: screen.colorDepth, availW: screen.availWidth, availH: screen.availHeight }), {});
@@ -418,12 +521,12 @@ const FIELD_DEFINITIONS = [
   { activityType: "TTg8cwtZM0E=", readableActivityType: "mainFingerprint", obfuscatedKey: "W0oqQR0oK3s=", readableKey: "webdriverDetected", sourceFunction: "AT()", sourceLine: 391, collectorGroup: "automation", status: "implemented" },
   { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "cRxAFzR5Ri0=", readableKey: "x", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
   { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "M2ICKXYCBR8=", readableKey: "y", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
-  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "WQQoDx9pJjk=", readableKey: "currentUrl", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "WQQoDx9pJjk=", readableKey: "stackTrace", sourceFunction: "lQ()", sourceLine: 2690, collectorGroup: "interaction", status: "implemented" },
   { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "QSwwZwRLNlY=", readableKey: "eventType", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
-  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "FmcnbFAFKFc=", readableKey: "eventTimestamp", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
-  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "JDFVOmJcWw8=", readableKey: "touchDetails", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "fallback" },
-  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "fWhMIzgITBA=", readableKey: "targetElement", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "implemented" },
-  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "HUhsQ1sqb3M=", readableKey: "interactionData", sourceFunction: "CY()", sourceLine: 9196, collectorGroup: "interaction", status: "fallback" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "FmcnbFAFKFc=", readableKey: "sessionTimeOffset", sourceFunction: "qj()", sourceLine: 3754, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "JDFVOmJcWw8=", readableKey: "isTrusted", sourceFunction: "pT()", sourceLine: 3647, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "fWhMIzgITBA=", readableKey: "targetVisible", sourceFunction: "qe()", sourceLine: 3740, collectorGroup: "interaction", status: "implemented" },
+  { activityType: "ajsbMC9eHwE=", readableActivityType: "clickTouch", obfuscatedKey: "HUhsQ1sqb3M=", readableKey: "targetSelector", sourceFunction: "pO(pU())", sourceLine: 3565, collectorGroup: "interaction", status: "implemented" },
   { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "aRRYHy95Xy4=", readableKey: "behaviorEnabled", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
   { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "eypKYT1HTFM=", readableKey: "behaviorInterval", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
   { activityType: "JVAUW2AzEW8=", readableActivityType: "behaviorCounter", obfuscatedKey: "OSQIb3xBC1Q=", readableKey: "behaviorSendCount", sourceFunction: "Im()", sourceLine: 5125, collectorGroup: "behavior", status: "implemented" },
@@ -837,20 +940,21 @@ async function collectMainFingerprintFields() {
 }
 
 function collectClickFields(eventLike) {
-  var eventData = eventLike || { x: 128, y: 256, type: "click", target: document.body };
+  var eventData = eventLike || { clientX: 128, clientY: 256, type: "click", isTrusted: true, target: document.body };
+  var coords = pY(eventData);
   var targets = createActivityTargets("ajsbMC9eHwE=", "clickTouch");
   function put(readableKey, value, statusOverride) {
     setField(targets, getFieldDefinition("ajsbMC9eHwE=", readableKey), value, statusOverride);
   }
 
-  put("x", eventData.x || eventData.pageX || 0);
-  put("y", eventData.y || eventData.pageY || 0);
-  put("currentUrl", location.href);
+  put("x", coords.x);
+  put("y", coords.y);
+  put("stackTrace", lQ());
   put("eventType", eventData.type || "click");
-  put("eventTimestamp", Date.now());
-  put("touchDetails", { touches: eventData.touches ? eventData.touches.length : 0 }, "fallback");
-  put("targetElement", eventData.target ? eventData.target.tagName || "unknown" : "unknown");
-  put("interactionData", { button: eventData.button || 0 }, "fallback");
+  put("sessionTimeOffset", qj());
+  put("isTrusted", pT(eventData));
+  put("targetVisible", qe(eventData.target));
+  put("targetSelector", pO(pU(eventData)));
   return targets;
 }
 
